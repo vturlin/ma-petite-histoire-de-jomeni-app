@@ -1,0 +1,125 @@
+import 'dart:async';
+import 'dart:convert';
+import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+
+class GeminiTtsService {
+  final String apiKey;
+
+  static const String _voice = 'Aoede';
+  static const Duration _timeout = Duration(seconds: 90);
+
+  GeminiTtsService(this.apiKey);
+
+  Future<Uint8List> generateAudio(String text) async {
+    final url = Uri.parse(
+      'https://generativelanguage.googleapis.com/v1beta/models/'
+      'gemini-3.1-flash-tts-preview:generateContent?key=$apiKey',
+    );
+
+    debugPrint('TTS → envoi requête (${text.length} chars)...');
+
+    http.Response response;
+    try {
+      response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'contents': [
+                {
+                  'parts': [{'text': text}],
+                }
+              ],
+              'generationConfig': {
+                'responseModalities': ['AUDIO'],
+                'speechConfig': {
+                  'voiceConfig': {
+                    'prebuiltVoiceConfig': {'voiceName': _voice},
+                  },
+                },
+              },
+            }),
+          )
+          .timeout(_timeout);
+    } on TimeoutException {
+      throw Exception('TTS timeout (>${_timeout.inSeconds}s) — texte trop long ?');
+    }
+
+    debugPrint('TTS → status HTTP : ${response.statusCode}');
+    debugPrint('TTS → taille réponse : ${response.bodyBytes.length} bytes');
+
+    if (response.statusCode != 200) {
+      throw Exception('TTS HTTP ${response.statusCode}: ${response.body}');
+    }
+
+    final Map<String, dynamic> data;
+    try {
+      data = jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (e) {
+      throw Exception('TTS réponse JSON invalide : $e');
+    }
+
+    final candidate = (data['candidates'] as List?)?.firstOrNull;
+    if (candidate == null) {
+      throw Exception('TTS : aucun candidat dans la réponse.\n${response.body}');
+    }
+
+    final parts = (candidate['content']?['parts'] as List?);
+    if (parts == null || parts.isEmpty) {
+      throw Exception('TTS : aucune partie audio dans la réponse.');
+    }
+
+    final inlineData = parts.first['inlineData'] as Map<String, dynamic>?;
+    if (inlineData == null) {
+      throw Exception('TTS : inlineData absent — modèle non supporté ?');
+    }
+
+    final mimeType = inlineData['mimeType'] as String;
+    final base64Audio = inlineData['data'] as String;
+    final pcmBytes = base64Decode(base64Audio);
+
+    final rateMatch = RegExp(r'rate=(\d+)').firstMatch(mimeType);
+    final sampleRate = int.parse(rateMatch?.group(1) ?? '24000');
+
+    debugPrint('TTS → OK : ${pcmBytes.length} bytes PCM @ ${sampleRate}Hz');
+
+    return _pcmToWav(pcmBytes, sampleRate: sampleRate);
+  }
+
+  Uint8List _pcmToWav(Uint8List pcm, {int sampleRate = 24000}) {
+    const int numChannels = 1;
+    const int bitsPerSample = 16;
+    final int byteRate = sampleRate * numChannels * bitsPerSample ~/ 8;
+    final int blockAlign = numChannels * bitsPerSample ~/ 8;
+    final int dataSize = pcm.length;
+    final int fileSize = 36 + dataSize;
+
+    final header = ByteData(44);
+
+    void writeStr(int offset, String s) {
+      for (int i = 0; i < s.length; i++) {
+        header.setUint8(offset + i, s.codeUnitAt(i));
+      }
+    }
+
+    writeStr(0, 'RIFF');
+    header.setUint32(4, fileSize, Endian.little);
+    writeStr(8, 'WAVE');
+    writeStr(12, 'fmt ');
+    header.setUint32(16, 16, Endian.little);
+    header.setUint16(20, 1, Endian.little);
+    header.setUint16(22, numChannels, Endian.little);
+    header.setUint32(24, sampleRate, Endian.little);
+    header.setUint32(28, byteRate, Endian.little);
+    header.setUint16(32, blockAlign, Endian.little);
+    header.setUint16(34, bitsPerSample, Endian.little);
+    writeStr(36, 'data');
+    header.setUint32(40, dataSize, Endian.little);
+
+    final wav = Uint8List(44 + pcm.length);
+    wav.setAll(0, header.buffer.asUint8List());
+    wav.setAll(44, pcm);
+    return wav;
+  }
+}

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../models/story_config.dart';
 
@@ -6,24 +7,28 @@ class GeminiService {
 
   GeminiService(String apiKey) {
     _model = GenerativeModel(
-      model: 'gemini-2.5-flash',
+      model: 'gemini-3.1-flash-lite-preview',
       apiKey: apiKey,
       systemInstruction: Content.system(
-        'Tu es un conteur expert pour enfants. '
-        'Tes histoires doivent être douces, bienveillantes, sans violence ni peur. '
-        'Utilise un vocabulaire simple, poétique et imagé. '
-        'Structure toujours : introduction magique → aventure avec l\'objet magique → fin positive. '
-        'Écris uniquement l\'histoire, sans titre ni introduction de ta part.',
+        'Tu es un auteur de contes pour enfants. '
+        'Ton but est de produire un récit fleuri, vivant et immersif. '
+        'Ne résume jamais l\'histoire : raconte-la avec des détails sensoriels, '
+        'des dialogues simples et des images poétiques. '
+        'L\'histoire doit toujours comporter une introduction, une aventure '
+        'avec l\'objet magique, et une fin douce et positive. '
+        'Vocabulaire adapté à l\'âge indiqué. Pas de violence, pas de peur excessive. '
+        'Écris uniquement le récit, sans titre ni introduction de ta part.',
       ),
       generationConfig: GenerationConfig(
-        temperature: 0.8,
-        maxOutputTokens: 1024,
+        temperature: 0.9,
+        maxOutputTokens: 2048,
       ),
+      // Filtres de sécurité : HARASSMENT et HATE_SPEECH bloqués au max.
+      // Les deux autres laissés au défaut Gemini pour éviter de bloquer
+      // des éléments narratifs innocents (loups, obscurité, magie, feu...).
       safetySettings: [
         SafetySetting(HarmCategory.harassment, HarmBlockThreshold.high),
         SafetySetting(HarmCategory.hateSpeech, HarmBlockThreshold.high),
-        SafetySetting(HarmCategory.sexuallyExplicit, HarmBlockThreshold.high),
-        SafetySetting(HarmCategory.dangerousContent, HarmBlockThreshold.high),
       ],
     );
   }
@@ -49,7 +54,33 @@ class GeminiService {
         'Termine sur un message positif ou une leçon douce.';
   }
 
-  /// Génère l'histoire en streaming mot par mot
+  Future<String> generateStory(StoryConfig config) async {
+    final prompt = buildPrompt(config);
+    final response = await _model.generateContent([Content.text(prompt)]);
+
+    // Diagnostic : affiche dans la console le résultat brut de l'API
+    final candidate = response.candidates.isNotEmpty
+        ? response.candidates.first
+        : null;
+    final finishReason = candidate?.finishReason;
+    final textLength = response.text?.length ?? 0;
+
+    debugPrint('--- Gemini debug ---');
+    debugPrint('finishReason : $finishReason');
+    debugPrint('Longueur texte reçu : $textLength caractères');
+    debugPrint('Début : ${response.text?.substring(0, textLength.clamp(0, 80))}...');
+    debugPrint('--------------------');
+
+    if (response.text == null || response.text!.isEmpty) {
+      throw Exception(
+        'Gemini n\'a pas renvoyé de texte. '
+        'Raison d\'arrêt : $finishReason',
+      );
+    }
+
+    return response.text!;
+  }
+
   Stream<String> generateStoryStream(StoryConfig config) async* {
     final prompt = buildPrompt(config);
     try {
@@ -60,14 +91,7 @@ class GeminiService {
         }
       }
     } catch (e) {
-      throw Exception('Erreur Gemini : $e');
+      throw Exception('Erreur Gemini streaming : $e');
     }
-  }
-
-  /// Génère l'histoire en un seul bloc
-  Future<String> generateStory(StoryConfig config) async {
-    final prompt = buildPrompt(config);
-    final response = await _model.generateContent([Content.text(prompt)]);
-    return response.text ?? "Désolé, je n'ai pas pu créer l'histoire.";
   }
 }
