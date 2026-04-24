@@ -12,6 +12,7 @@ import 'screens/screen7_story.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
   runApp(const JomeniApp());
 }

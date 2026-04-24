@@ -37,7 +37,14 @@ class _MagicObjectScreenState extends State<MagicObjectScreen> {
 
   Future<void> _initSpeech() async {
     _speechAvailable = await _speech.initialize();
-    setState(() {});
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _speech.stop();
+    _controller.dispose();
+    super.dispose();
   }
 
   Future<void> _toggleListening() async {
@@ -48,9 +55,11 @@ class _MagicObjectScreenState extends State<MagicObjectScreen> {
       setState(() => _isListening = true);
       await _speech.listen(
         onResult: (result) {
-          setState(() {
-            _controller.text = result.recognizedWords;
-          });
+          if (mounted) {
+            setState(() {
+              _controller.text = result.recognizedWords;
+            });
+          }
         },
         localeId: 'fr_FR',
       );
