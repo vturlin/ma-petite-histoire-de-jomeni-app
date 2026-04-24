@@ -5,16 +5,28 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/saved_story.dart';
 import '../models/story_config.dart';
 import '../services/gemini_service.dart';
 import '../services/gemini_tts_service.dart';
+import '../services/story_library_service.dart';
 import '../theme/app_theme.dart';
 
 class StoryScreen extends StatefulWidget {
-  final StoryConfig config;
+  /// Mode génération : config + apiKey
+  final StoryConfig? config;
   final String apiKey;
+  /// Mode bibliothèque : histoire déjà sauvegardée
+  final SavedStory? savedStory;
 
-  const StoryScreen({super.key, required this.config, required this.apiKey});
+  const StoryScreen({
+    super.key,
+    this.config,
+    required this.apiKey,
+    this.savedStory,
+  }) : assert(config != null || savedStory != null);
+
+  bool get isLibraryMode => savedStory != null;
 
   @override
   State<StoryScreen> createState() => _StoryScreenState();
@@ -23,7 +35,7 @@ class StoryScreen extends StatefulWidget {
 class _StoryScreenState extends State<StoryScreen> {
   final AudioPlayer _player = AudioPlayer();
 
-  // --- Texte ---
+  // ─── Texte ────────────────────────────────────────────────────────────────
   String _fullStory = '';
   String _displayedStory = '';
   String _promptUsed = '';
@@ -35,28 +47,58 @@ class _StoryScreenState extends State<StoryScreen> {
   Timer? _typingTimer;
   int _typingIndex = 0;
 
-  // --- TTS / Lecture ---
-  // État de lecture : idle | loadingAudio | playing | paused
+  // ─── Lecture TTS ──────────────────────────────────────────────────────────
   bool _isPlaying = false;
   bool _isPaused = false;
   bool _isLoadingAudio = false;
   String _audioStatus = '';
   String? _ttsError;
 
-  // Chunking : un paragraphe à la fois
   List<String> _chunks = [];
   int _currentChunk = 0;
-  final Map<int, Uint8List> _audioCache = {}; // audio pré-généré par index
+  final Map<int, Uint8List> _audioCache = {};
   bool _isPregenerating = false;
+
+  // ─── Sauvegarde ───────────────────────────────────────────────────────────
+  bool _isSaved = false;
+  bool _isSaving = false;
+  String _saveStatus = '';
+  String? _storyId;
 
   @override
   void initState() {
     super.initState();
     _player.onPlayerComplete.listen((_) => _onChunkComplete());
-    _generateStory();
+
+    if (widget.isLibraryMode) {
+      _loadFromLibrary();
+    } else {
+      _generateStory();
+    }
   }
 
-  // ─── Génération de l'histoire ────────────────────────────────────────────
+  // ─── Chargement depuis la bibliothèque ────────────────────────────────────
+
+  void _loadFromLibrary() {
+    final saved = widget.savedStory!;
+    _fullStory = saved.text;
+    _storyId = saved.id;
+    _isSaved = true;
+    _chunks = _splitIntoChunks(_fullStory);
+
+    // Charge l'audio depuis le cache Hive
+    for (int i = 0; i < saved.audioChunkCount; i++) {
+      final wav = storyLibrary.getAudioChunk(saved.id, i);
+      if (wav != null) _audioCache[i] = wav;
+    }
+
+    setState(() {
+      _isLoading = false;
+      _displayedStory = _fullStory;
+    });
+  }
+
+  // ─── Génération de l'histoire ─────────────────────────────────────────────
 
   Future<void> _generateStory() async {
     setState(() {
@@ -68,18 +110,20 @@ class _StoryScreenState extends State<StoryScreen> {
       _chunks = [];
       _currentChunk = 0;
       _audioCache.clear();
+      _isSaved = false;
+      _storyId = DateTime.now().millisecondsSinceEpoch.toString();
     });
 
     try {
       final service = GeminiService(widget.apiKey);
-      _promptUsed = service.buildPrompt(widget.config);
+      _promptUsed = service.buildPrompt(widget.config!);
 
       String story;
       if (kIsWeb) {
-        story = await service.generateStory(widget.config);
+        story = await service.generateStory(widget.config!);
       } else {
         final buffer = StringBuffer();
-        await for (final chunk in service.generateStoryStream(widget.config)) {
+        await for (final chunk in service.generateStoryStream(widget.config!)) {
           buffer.write(chunk);
         }
         story = buffer.toString();
@@ -91,7 +135,6 @@ class _StoryScreenState extends State<StoryScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('last_story', _fullStory);
       await prefs.setString('last_prompt', _promptUsed);
-      await prefs.setString('last_story_title', widget.config.storyTitle);
 
       setState(() => _isLoading = false);
       _startTypewriter();
@@ -103,7 +146,6 @@ class _StoryScreenState extends State<StoryScreen> {
     }
   }
 
-  /// Découpe l'histoire en paragraphes d'environ 400-600 caractères.
   List<String> _splitIntoChunks(String text) {
     final rawParagraphs = text
         .split(RegExp(r'\n\n+'))
@@ -111,7 +153,6 @@ class _StoryScreenState extends State<StoryScreen> {
         .where((p) => p.isNotEmpty)
         .toList();
 
-    // Fusionne les paragraphes trop courts pour atteindre ~400 chars
     final chunks = <String>[];
     final buffer = StringBuffer();
     for (final para in rawParagraphs) {
@@ -129,11 +170,10 @@ class _StoryScreenState extends State<StoryScreen> {
         chunks.add(buffer.toString());
       }
     }
-    debugPrint('TTS chunks : ${chunks.length} (tailles : ${chunks.map((c) => c.length).join(', ')})');
     return chunks.isEmpty ? [text] : chunks;
   }
 
-  // ─── Animation machine à écrire ──────────────────────────────────────────
+  // ─── Typewriter ───────────────────────────────────────────────────────────
 
   void _startTypewriter() {
     _typingTimer?.cancel();
@@ -154,26 +194,22 @@ class _StoryScreenState extends State<StoryScreen> {
     });
   }
 
-  // ─── Lecture TTS ─────────────────────────────────────────────────────────
+  // ─── Lecture TTS ──────────────────────────────────────────────────────────
 
   Future<void> _handlePlayButton() async {
     if (_isPlaying) {
-      // → Pause (garde la position dans le chunk)
       await _player.pause();
       setState(() { _isPlaying = false; _isPaused = true; });
     } else if (_isPaused) {
-      // → Reprise exactement où on s'était arrêté
       await _player.resume();
       setState(() { _isPlaying = true; _isPaused = false; });
     } else {
-      // → Démarrage depuis le début
       _startPlayback();
     }
   }
 
   Future<void> _startPlayback() async {
     _currentChunk = 0;
-    _audioCache.clear();
     await _playChunk(0);
   }
 
@@ -193,11 +229,14 @@ class _StoryScreenState extends State<StoryScreen> {
       Uint8List audio;
       if (_audioCache.containsKey(index)) {
         audio = _audioCache[index]!;
-        debugPrint('TTS chunk $index : depuis le cache');
       } else {
         final tts = GeminiTtsService(widget.apiKey);
         audio = await tts.generateAudio(_chunks[index]);
         _audioCache[index] = audio;
+        // Sauvegarde automatique du chunk audio si l'histoire est déjà sauvegardée
+        if (_isSaved && _storyId != null) {
+          await storyLibrary.saveAudioChunk(_storyId!, index, audio);
+        }
       }
 
       if (!mounted) return;
@@ -209,8 +248,6 @@ class _StoryScreenState extends State<StoryScreen> {
       });
 
       await _player.play(BytesSource(audio));
-
-      // Pré-génère le chunk suivant en arrière-plan pendant la lecture
       _pregenerateChunk(index + 1);
     } catch (e) {
       if (!mounted) return;
@@ -223,29 +260,96 @@ class _StoryScreenState extends State<StoryScreen> {
     }
   }
 
-  /// Pré-génère un chunk en arrière-plan sans bloquer la lecture.
   Future<void> _pregenerateChunk(int index) async {
-    if (index >= _chunks.length || _audioCache.containsKey(index) || _isPregenerating) {
-      return;
-    }
+    if (index >= _chunks.length || _audioCache.containsKey(index) || _isPregenerating) return;
     _isPregenerating = true;
     try {
       final tts = GeminiTtsService(widget.apiKey);
       final audio = await tts.generateAudio(_chunks[index]);
-      if (mounted) _audioCache[index] = audio;
-      debugPrint('TTS chunk $index pré-généré (${audio.length} bytes)');
-    } catch (e) {
-      debugPrint('TTS pré-génération chunk $index échouée : $e');
+      if (!mounted) return;
+      _audioCache[index] = audio;
+      if (_isSaved && _storyId != null) {
+        await storyLibrary.saveAudioChunk(_storyId!, index, audio);
+      }
+    } catch (_) {
     } finally {
       _isPregenerating = false;
     }
   }
 
-  /// Appelé automatiquement quand un chunk se termine.
   void _onChunkComplete() {
     if (!mounted || !_isPlaying) return;
     _currentChunk++;
     _playChunk(_currentChunk);
+  }
+
+  // ─── Sauvegarde ───────────────────────────────────────────────────────────
+
+  Future<void> _saveStory() async {
+    if (_isSaved || _isSaving || _fullStory.isEmpty) return;
+
+    setState(() {
+      _isSaving = true;
+      _saveStatus = 'Génération audio en cours...';
+    });
+
+    // Génère les chunks audio manquants
+    final tts = GeminiTtsService(widget.apiKey);
+    for (int i = 0; i < _chunks.length; i++) {
+      if (!_audioCache.containsKey(i)) {
+        setState(() => _saveStatus = 'Audio ${i + 1}/${_chunks.length}...');
+        try {
+          final audio = await tts.generateAudio(_chunks[i]);
+          _audioCache[i] = audio;
+        } catch (e) {
+          setState(() {
+            _isSaving = false;
+            _ttsError = 'Erreur génération audio : $e';
+            _saveStatus = '';
+          });
+          return;
+        }
+      }
+    }
+
+    // Sauvegarde en base
+    final config = widget.config!;
+    final story = SavedStory(
+      id: _storyId!,
+      title: config.storyTitle.isEmpty ? 'Mon histoire' : config.storyTitle,
+      text: _fullStory,
+      createdAt: DateTime.now(),
+      ageLabel: config.ageCategory?.label ?? '',
+      themeEmoji: config.theme?.emoji ?? '✨',
+      themeLabel: config.theme?.label ?? '',
+      storyTypeLabel: config.storyType?.label ?? '',
+      heroName: config.heroName,
+      magicObject: config.magicObject,
+      audioChunkCount: _chunks.length,
+    );
+
+    await storyLibrary.saveMeta(story);
+    for (int i = 0; i < _chunks.length; i++) {
+      if (_audioCache.containsKey(i)) {
+        await storyLibrary.saveAudioChunk(_storyId!, i, _audioCache[i]!);
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _isSaved = true;
+      _isSaving = false;
+      _saveStatus = '';
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('✅ Histoire sauvegardée avec l\'audio !'),
+        backgroundColor: AppTheme.primary,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
   }
 
   @override
@@ -255,7 +359,7 @@ class _StoryScreenState extends State<StoryScreen> {
     super.dispose();
   }
 
-  // ─── UI ──────────────────────────────────────────────────────────────────
+  // ─── UI ───────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
@@ -265,6 +369,21 @@ class _StoryScreenState extends State<StoryScreen> {
           children: [
             _buildHeader(),
             if (_showPrompt && _promptUsed.isNotEmpty) _buildPromptRecap(),
+            if (_isSaving)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: LinearProgressIndicator(
+                  backgroundColor: Colors.white12,
+                  color: AppTheme.accent,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            if (_saveStatus.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text(_saveStatus,
+                    style: const TextStyle(color: Colors.white54, fontSize: 11)),
+              ),
             Expanded(
               child: _error != null
                   ? _buildError()
@@ -275,12 +394,10 @@ class _StoryScreenState extends State<StoryScreen> {
             if (!_isLoading && _fullStory.isNotEmpty) _buildPlayer(),
             if (_ttsError != null)
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
-                child: Text(
-                  _ttsError!,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.redAccent, fontSize: 11),
-                ),
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                child: Text(_ttsError!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.redAccent, fontSize: 11)),
               ),
           ],
         ),
@@ -296,29 +413,37 @@ class _StoryScreenState extends State<StoryScreen> {
           IconButton(
             onPressed: () async {
               await _player.stop();
-              if (mounted) context.go('/');
+              if (mounted) context.pop();
             },
-            icon: const Icon(Icons.home, color: Colors.white70),
+            icon: const Icon(Icons.arrow_back_ios, color: Colors.white70, size: 20),
           ),
           Expanded(
             child: Text(
-              widget.config.storyTitle.isEmpty ? 'Mon histoire' : widget.config.storyTitle,
+              widget.isLibraryMode
+                  ? (widget.savedStory!.title.isEmpty ? 'Mon histoire' : widget.savedStory!.title)
+                  : (widget.config!.storyTitle.isEmpty ? 'Mon histoire' : widget.config!.storyTitle),
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          IconButton(
-            onPressed: () => setState(() => _showPrompt = !_showPrompt),
-            tooltip: 'Voir le prompt envoyé',
-            icon: Icon(
-              Icons.code,
-              color: _showPrompt ? AppTheme.accent : Colors.white38,
-              size: 20,
+          // Bouton prompt (mode génération uniquement)
+          if (!widget.isLibraryMode)
+            IconButton(
+              onPressed: () => setState(() => _showPrompt = !_showPrompt),
+              icon: Icon(Icons.code, color: _showPrompt ? AppTheme.accent : Colors.white38, size: 20),
             ),
-          ),
+          // Bouton sauvegarder (mode génération uniquement)
+          if (!widget.isLibraryMode)
+            IconButton(
+              onPressed: (_isSaved || _isSaving || _isLoading) ? null : _saveStory,
+              tooltip: _isSaved ? 'Déjà sauvegardée' : 'Sauvegarder',
+              icon: Icon(
+                _isSaved ? Icons.bookmark : Icons.bookmark_border,
+                color: _isSaved ? AppTheme.accent : Colors.white54,
+                size: 24,
+              ),
+            ),
         ],
       ),
     );
@@ -340,27 +465,15 @@ class _StoryScreenState extends State<StoryScreen> {
             children: [
               const Icon(Icons.psychology_alt, color: AppTheme.accent, size: 15),
               const SizedBox(width: 6),
-              const Text(
-                'Prompt envoyé à Gemini',
-                style: TextStyle(
-                  color: AppTheme.accent, fontSize: 11,
-                  fontWeight: FontWeight.bold, letterSpacing: 0.5,
-                ),
-              ),
+              const Text('Prompt Gemini', style: TextStyle(color: AppTheme.accent, fontSize: 11, fontWeight: FontWeight.bold)),
               const Spacer(),
-              Text(
-                '${_chunks.length} partie${_chunks.length > 1 ? 's' : ''} audio',
-                style: const TextStyle(color: Colors.white30, fontSize: 10),
-              ),
+              Text('${_chunks.length} partie${_chunks.length > 1 ? 's' : ''} audio',
+                  style: const TextStyle(color: Colors.white30, fontSize: 10)),
             ],
           ),
           const Divider(color: Colors.white10, height: 12),
-          Text(
-            _promptUsed,
-            style: const TextStyle(
-              color: Colors.white60, fontSize: 11, height: 1.6, fontFamily: 'monospace',
-            ),
-          ),
+          Text(_promptUsed,
+              style: const TextStyle(color: Colors.white60, fontSize: 11, height: 1.6, fontFamily: 'monospace')),
         ],
       ),
     );
@@ -379,7 +492,7 @@ class _StoryScreenState extends State<StoryScreen> {
           const Text('✨ Gemini écrit ton histoire...', style: TextStyle(color: Colors.white70, fontSize: 18)),
           const SizedBox(height: 8),
           Text(
-            '${widget.config.theme?.emoji ?? ''} ${widget.config.theme?.label ?? ''} · 🪄 ${widget.config.magicObject}',
+            '${widget.config?.theme?.emoji ?? ''} ${widget.config?.theme?.label ?? ''} · 🪄 ${widget.config?.magicObject ?? ''}',
             style: const TextStyle(color: Colors.white38, fontSize: 13),
           ),
         ],
@@ -434,55 +547,43 @@ class _StoryScreenState extends State<StoryScreen> {
   }
 
   Widget _buildPlayer() {
-    // Icône et couleur du bouton central selon l'état
     final bool inactive = _isTyping;
     final IconData playIcon = _isPlaying ? Icons.pause : Icons.play_arrow;
     final Color btnColor = inactive
         ? Colors.white12
-        : _isPlaying
-            ? AppTheme.secondary
-            : _isPaused
-                ? AppTheme.primary
-                : AppTheme.accent;
+        : _isPlaying ? AppTheme.secondary : _isPaused ? AppTheme.primary : AppTheme.accent;
 
     return Column(
       children: [
-        // Indicateur de progression audio
         if (_audioStatus.isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(bottom: 4),
-            child: Text(
-              _audioStatus,
-              style: TextStyle(
-                color: _isPlaying ? AppTheme.accent : Colors.white38,
-                fontSize: 11,
-              ),
-            ),
+            child: Text(_audioStatus,
+                style: TextStyle(color: _isPlaying ? AppTheme.accent : Colors.white38, fontSize: 11)),
           ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _playerButton(icon: Icons.refresh, label: 'Nouvelle', onTap: () async {
-                await _player.stop();
-                if (mounted) context.go('/');
-              }),
-              // Bouton lecture central
+              _playerButton(
+                icon: Icons.home,
+                label: 'Accueil',
+                onTap: () async {
+                  await _player.stop();
+                  if (mounted) context.go('/');
+                },
+              ),
               GestureDetector(
                 onTap: inactive ? null : _handlePlayButton,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  width: 64,
-                  height: 64,
+                  width: 64, height: 64,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: btnColor,
                     boxShadow: inactive ? [] : [
-                      BoxShadow(
-                        color: btnColor.withValues(alpha: 0.45),
-                        blurRadius: 14, spreadRadius: 2,
-                      ),
+                      BoxShadow(color: btnColor.withValues(alpha: 0.45), blurRadius: 14, spreadRadius: 2),
                     ],
                   ),
                   child: _isLoadingAudio
@@ -498,12 +599,19 @@ class _StoryScreenState extends State<StoryScreen> {
                 ),
               ),
               _playerButton(
-                icon: Icons.casino,
-                label: 'Recréer',
-                onTap: (inactive || _isPlaying || _isPaused) ? null : () async {
-                  await _player.stop();
-                  _generateStory();
-                },
+                icon: widget.isLibraryMode ? Icons.list : Icons.casino,
+                label: widget.isLibraryMode ? 'Bibliothèque' : 'Recréer',
+                onTap: widget.isLibraryMode
+                    ? () async {
+                        await _player.stop();
+                        if (mounted) context.push('/library');
+                      }
+                    : (inactive || _isPlaying || _isPaused)
+                        ? null
+                        : () async {
+                            await _player.stop();
+                            _generateStory();
+                          },
               ),
             ],
           ),
@@ -515,13 +623,13 @@ class _StoryScreenState extends State<StoryScreen> {
   Widget _playerButton({required IconData icon, required String label, VoidCallback? onTap}) {
     return ElevatedButton.icon(
       onPressed: onTap,
-      icon: Icon(icon, size: 16),
+      icon: Icon(icon, size: 15),
       label: Text(label),
       style: ElevatedButton.styleFrom(
         backgroundColor: AppTheme.cardBg,
         foregroundColor: onTap == null ? Colors.white30 : Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        textStyle: const TextStyle(fontSize: 13),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        textStyle: const TextStyle(fontSize: 12),
       ),
     );
   }

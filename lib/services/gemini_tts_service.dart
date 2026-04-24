@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
@@ -80,11 +81,32 @@ class GeminiTtsService {
     final pcmBytes = base64Decode(base64Audio);
 
     final rateMatch = RegExp(r'rate=(\d+)').firstMatch(mimeType);
-    final sampleRate = int.parse(rateMatch?.group(1) ?? '24000');
+    final originalRate = int.parse(rateMatch?.group(1) ?? '24000');
 
-    debugPrint('TTS → OK : ${pcmBytes.length} bytes PCM @ ${sampleRate}Hz');
+    // Downsample 24kHz → 16kHz : -50% de taille, qualité largement suffisante
+    final pcmFinal = originalRate == 24000
+        ? _downsample24to16kHz(pcmBytes)
+        : pcmBytes;
+    const targetRate = 16000;
 
-    return _pcmToWav(pcmBytes, sampleRate: sampleRate);
+    debugPrint(
+      'TTS → OK : ${pcmBytes.length} bytes @ ${originalRate}Hz '
+      '→ ${pcmFinal.length} bytes @ ${targetRate}Hz',
+    );
+
+    return _pcmToWav(pcmFinal, sampleRate: targetRate);
+  }
+
+  /// Downsample PCM 16-bit mono de 24kHz à 16kHz (ratio 2/3).
+  /// Garde 2 samples sur 3, sans filtre anti-repliement (suffisant pour la voix).
+  Uint8List _downsample24to16kHz(Uint8List pcm24) {
+    final builder = BytesBuilder(copy: false);
+    for (int i = 0; i + 1 < pcm24.length; i += 6) {
+      // Garde les 2 premiers samples (4 bytes), saute le 3ème (2 bytes)
+      final end = (i + 4).clamp(0, pcm24.length);
+      builder.add(pcm24.sublist(i, end));
+    }
+    return builder.toBytes();
   }
 
   Uint8List _pcmToWav(Uint8List pcm, {int sampleRate = 24000}) {
