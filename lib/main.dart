@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:go_router/go_router.dart';
 import 'models/story_config.dart';
 import 'screens/screen1_welcome.dart';
@@ -10,10 +11,8 @@ import 'screens/screen6_magic_object.dart';
 import 'screens/screen7_story.dart';
 import 'theme/app_theme.dart';
 
-// ⚠️  Remplace par ta clé API Gemini depuis https://aistudio.google.com/
-const String _geminiApiKey = 'VOTRE_CLE_API_GEMINI_ICI';
-
-void main() {
+void main() async {
+  await dotenv.load(fileName: '.env');
   runApp(const JomeniApp());
 }
 
@@ -67,7 +66,7 @@ final GoRouter _router = GoRouter(
       path: '/generating',
       builder: (context, state) => StoryScreen(
         config: state.extra as StoryConfig,
-        apiKey: _geminiApiKey,
+        apiKey: dotenv.env['GEMINI_API_KEY'] ?? '',
       ),
     ),
   ],
