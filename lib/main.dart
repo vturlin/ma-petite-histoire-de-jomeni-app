@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'models/saved_story.dart';
 import 'models/story_config.dart';
 import 'screens/screen0_home.dart';
@@ -12,12 +13,16 @@ import 'screens/screen5_story_type.dart';
 import 'screens/screen6_magic_object.dart';
 import 'screens/screen7_story.dart';
 import 'screens/screen_library.dart';
+import 'screens/screen_profiles.dart';
 import 'services/story_library_service.dart';
+import 'services/user_profile_service.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
+  await Hive.initFlutter();
+  await UserProfileService.init();
   await StoryLibraryService.init();
   runApp(const JomeniApp());
 }
@@ -37,9 +42,14 @@ class JomeniApp extends StatelessWidget {
 }
 
 final GoRouter _router = GoRouter(
-  initialLocation: '/',
+  initialLocation: '/profiles',
   routes: [
-    // Écran d'accueil
+    // Sélection de profil (point d'entrée)
+    GoRoute(
+      path: '/profiles',
+      builder: (context, state) => const ProfilesScreen(),
+    ),
+    // Accueil (après sélection du profil)
     GoRoute(
       path: '/',
       builder: (context, state) => const HomeScreen(),

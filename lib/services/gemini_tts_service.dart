@@ -12,7 +12,7 @@ class GeminiTtsService {
 
   GeminiTtsService(this.apiKey);
 
-  Future<Uint8List> generateAudio(String text, {int maxRetries = 3}) async {
+  Future<Uint8List> generateAudio(String text, {int maxRetries = 5}) async {
     final url = Uri.parse(
       'https://generativelanguage.googleapis.com/v1beta/models/'
       'gemini-3.1-flash-tts-preview:generateContent?key=$apiKey',

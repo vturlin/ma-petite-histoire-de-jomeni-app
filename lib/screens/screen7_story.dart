@@ -251,10 +251,19 @@ class _StoryScreenState extends State<StoryScreen> {
       // (~30-45s par chunk) espace suffisamment les appels API.
     } catch (e) {
       if (!mounted) return;
+      final msg = e.toString();
+      String friendlyError;
+      if (msg.contains('429') || msg.contains('RESOURCE_EXHAUSTED')) {
+        friendlyError = '⏳ Quota audio momentanément dépassé. Réessaie dans 1 minute.';
+      } else if (msg.contains('timeout')) {
+        friendlyError = '⏱️ Délai dépassé. Vérifie ta connexion et réessaie.';
+      } else {
+        friendlyError = '🎙️ Génération audio impossible. Réessaie.';
+      }
       setState(() {
         _isLoadingAudio = false;
         _isPlaying = false;
-        _ttsError = 'Erreur audio : $e';
+        _ttsError = friendlyError;
         _audioStatus = '';
       });
     }
@@ -297,9 +306,12 @@ class _StoryScreenState extends State<StoryScreen> {
           _audioCache[i] = audio;
         } catch (e) {
           if (!mounted) return;
+          final msg = e.toString();
           setState(() {
             _isSaving = false;
-            _ttsError = 'Erreur génération audio : $e';
+            _ttsError = msg.contains('429') || msg.contains('RESOURCE_EXHAUSTED')
+                ? '⏳ Quota audio dépassé. Réessaie dans 1 minute.'
+                : '🎙️ Génération audio échouée. Réessaie.';
             _saveStatus = '';
           });
           return;
