@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import '../models/story_config.dart';
 import '../theme/app_theme.dart';
+import '../widgets/profile_button.dart';
 import '../widgets/step_progress.dart';
 
 class HeroNameScreen extends StatefulWidget {
@@ -66,7 +67,12 @@ class _HeroNameScreenState extends State<HeroNameScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const StepProgress(currentStep: 3, totalSteps: 6),
+              Row(
+                children: const [
+                  Expanded(child: StepProgress(currentStep: 3, totalSteps: 6)),
+                  ProfileButton(),
+                ],
+              ),
               const SizedBox(height: 32),
               const Text(
                 '🎤 Nomme ton héros',

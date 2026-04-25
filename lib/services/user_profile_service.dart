@@ -24,6 +24,7 @@ class UserProfileService {
     required String name,
     required String emoji,
     required int colorIndex,
+    ProfileAge? age,
   }) async {
     final profile = UserProfile(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -31,9 +32,17 @@ class UserProfileService {
       emoji: emoji,
       colorIndex: colorIndex,
       createdAt: DateTime.now(),
+      age: age,
     );
     await _box.put(profile.id, profile.toMap());
     return profile;
+  }
+
+  Future<void> update(UserProfile profile) async {
+    await _box.put(profile.id, profile.toMap());
+    if (currentProfile?.id == profile.id) {
+      currentProfile = profile;
+    }
   }
 
   Future<void> delete(String id) async {

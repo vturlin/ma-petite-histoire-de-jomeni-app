@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../services/story_library_service.dart';
-import '../services/user_profile_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/profile_button.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -101,25 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     .fadeIn(delay: 600.ms),
                 const Spacer(),
                 // Profil actif
-                GestureDetector(
-                  onTap: () => context.push('/profiles'),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        userProfileService.currentProfile?.emoji ?? '👤',
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        userProfileService.currentProfile?.name ?? 'Invité',
-                        style: const TextStyle(color: Colors.white38, fontSize: 13),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.swap_horiz, color: Colors.white24, size: 14),
-                    ],
-                  ),
-                ).animate().fadeIn(delay: 700.ms),
+                const ProfileButton().animate().fadeIn(delay: 700.ms),
                 const SizedBox(height: 6),
                 const Text(
                   'Propulsé par Gemini AI',

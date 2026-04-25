@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import '../models/story_config.dart';
 import '../theme/app_theme.dart';
+import '../widgets/profile_button.dart';
 import '../widgets/step_progress.dart';
 
 class MagicObjectScreen extends StatefulWidget {
@@ -75,7 +76,12 @@ class _MagicObjectScreenState extends State<MagicObjectScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const StepProgress(currentStep: 6, totalSteps: 6),
+              Row(
+                children: const [
+                  Expanded(child: StepProgress(currentStep: 6, totalSteps: 6)),
+                  ProfileButton(),
+                ],
+              ),
               const SizedBox(height: 32),
               const Text(
                 '🪄 L\'objet magique',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/story_config.dart';
+import '../widgets/profile_button.dart';
 import '../widgets/step_progress.dart';
 import '../widgets/choice_card.dart';
 
@@ -30,7 +31,12 @@ class _StoryTypeScreenState extends State<StoryTypeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const StepProgress(currentStep: 5, totalSteps: 6),
+              Row(
+                children: const [
+                  Expanded(child: StepProgress(currentStep: 5, totalSteps: 6)),
+                  ProfileButton(),
+                ],
+              ),
               const SizedBox(height: 32),
               const Text(
                 '📖 Type d\'histoire',

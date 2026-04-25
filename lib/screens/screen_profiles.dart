@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../models/user_profile.dart';
 import '../services/user_profile_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/profile_sheet.dart';
 
 class ProfilesScreen extends StatefulWidget {
   const ProfilesScreen({super.key});
@@ -15,7 +16,6 @@ class ProfilesScreen extends StatefulWidget {
 class _ProfilesScreenState extends State<ProfilesScreen> {
   List<UserProfile> _profiles = [];
 
-  // Couleurs des cartes de profil
   static const List<Color> _cardColors = [
     Color(0xFF6C3CE1),
     Color(0xFFFF6B6B),
@@ -69,7 +69,6 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                 style: TextStyle(color: Colors.white54, fontSize: 15),
               ).animate().fadeIn(delay: 100.ms),
               const SizedBox(height: 40),
-              // Grille de profils
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -80,16 +79,16 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
                       mainAxisSpacing: 16,
                       childAspectRatio: 0.85,
                     ),
-                    itemCount: _profiles.length + 1, // +1 pour le bouton "+"
+                    itemCount: _profiles.length + 1,
                     itemBuilder: (context, index) {
                       if (index == _profiles.length) {
-                        return _AddProfileCard(onTap: () => _showCreateDialog());
+                        return _AddProfileCard(onTap: () => _showCreateSheet());
                       }
                       return _ProfileCard(
                         profile: _profiles[index],
                         color: _cardColors[_profiles[index].colorIndex % _cardColors.length],
                         onTap: () => _selectProfile(_profiles[index]),
-                        onDelete: () => _deleteProfile(_profiles[index]),
+                        onLongPress: () => _showProfileOptions(_profiles[index]),
                       ).animate().scale(
                         delay: Duration(milliseconds: index * 80),
                         duration: 300.ms,
@@ -101,12 +100,53 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
               ),
               const SizedBox(height: 24),
               const Text(
-                'Appuie longtemps pour supprimer un profil',
+                'Appuie longtemps pour modifier ou supprimer',
                 style: TextStyle(color: Colors.white24, fontSize: 11),
               ),
               const SizedBox(height: 16),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showProfileOptions(UserProfile profile) async {
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.cardBg,
+        title: Row(
+          children: [
+            Text(profile.emoji, style: const TextStyle(fontSize: 24)),
+            const SizedBox(width: 10),
+            Text(profile.name,
+                style: const TextStyle(color: Colors.white, fontSize: 18)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.edit, color: Colors.white70),
+              title: const Text('Modifier',
+                  style: TextStyle(color: Colors.white)),
+              onTap: () {
+                Navigator.pop(context);
+                _showEditSheet(profile);
+              },
+            ),
+            ListTile(
+              leading:
+                  const Icon(Icons.delete_outline, color: Colors.redAccent),
+              title: const Text('Supprimer',
+                  style: TextStyle(color: Colors.redAccent)),
+              onTap: () {
+                Navigator.pop(context);
+                _deleteProfile(profile);
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -126,11 +166,13 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Annuler', style: TextStyle(color: Colors.white54)),
+            child:
+                const Text('Annuler', style: TextStyle(color: Colors.white54)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Supprimer', style: TextStyle(color: Colors.redAccent)),
+            child: const Text('Supprimer',
+                style: TextStyle(color: Colors.redAccent)),
           ),
         ],
       ),
@@ -141,16 +183,29 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     }
   }
 
-  void _showCreateDialog() {
+  void _showCreateSheet() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => _CreateProfileSheet(
-        onCreated: (profile) {
+      builder: (_) => ProfileSheet(
+        onSaved: (profile) {
           _load();
           _selectProfile(profile);
         },
+      ),
+    );
+  }
+
+  void _showEditSheet(UserProfile profile) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => ProfileSheet(
+        existingProfile: profile,
+        onSaved: (_) => _load(),
+        onDeleted: _load,
       ),
     );
   }
@@ -162,20 +217,20 @@ class _ProfileCard extends StatelessWidget {
   final UserProfile profile;
   final Color color;
   final VoidCallback onTap;
-  final VoidCallback onDelete;
+  final VoidCallback onLongPress;
 
   const _ProfileCard({
     required this.profile,
     required this.color,
     required this.onTap,
-    required this.onDelete,
+    required this.onLongPress,
   });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      onLongPress: onDelete,
+      onLongPress: onLongPress,
       child: Column(
         children: [
           Expanded(
@@ -185,8 +240,31 @@ class _ProfileCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(color: color.withValues(alpha: 0.5), width: 2),
               ),
-              child: Center(
-                child: Text(profile.emoji, style: const TextStyle(fontSize: 44)),
+              child: Stack(
+                children: [
+                  Center(
+                    child: Text(profile.emoji,
+                        style: const TextStyle(fontSize: 44)),
+                  ),
+                  if (profile.age != null)
+                    Positioned(
+                      bottom: 6,
+                      right: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          profile.age!.label,
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 9),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
@@ -237,158 +315,6 @@ class _AddProfileCard extends StatelessWidget {
           const Text(
             'Ajouter',
             style: TextStyle(color: Colors.white54, fontSize: 14),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ─── Feuille de création de profil ────────────────────────────────────────────
-
-class _CreateProfileSheet extends StatefulWidget {
-  final void Function(UserProfile) onCreated;
-
-  const _CreateProfileSheet({required this.onCreated});
-
-  @override
-  State<_CreateProfileSheet> createState() => _CreateProfileSheetState();
-}
-
-class _CreateProfileSheetState extends State<_CreateProfileSheet> {
-  final _controller = TextEditingController();
-  String _selectedEmoji = UserProfile.availableEmojis.first;
-  int _selectedColor = 0;
-
-  static const List<Color> _colors = [
-    Color(0xFF6C3CE1), Color(0xFFFF6B6B), Color(0xFF4ECDC4),
-    Color(0xFFFFD93D), Color(0xFF95E1D3), Color(0xFFF38181),
-    Color(0xFF3D5A80), Color(0xFFE8A87C),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-        top: 24, left: 24, right: 24,
-      ),
-      decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(28),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Aperçu
-          Container(
-            width: 80, height: 80,
-            decoration: BoxDecoration(
-              color: _colors[_selectedColor].withValues(alpha: 0.25),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: _colors[_selectedColor], width: 2),
-            ),
-            child: Center(child: Text(_selectedEmoji, style: const TextStyle(fontSize: 40))),
-          ),
-          const SizedBox(height: 20),
-          // Nom
-          TextField(
-            controller: _controller,
-            autofocus: true,
-            style: const TextStyle(color: Colors.white, fontSize: 18),
-            textAlign: TextAlign.center,
-            decoration: InputDecoration(
-              hintText: 'Prénom',
-              hintStyle: const TextStyle(color: Colors.white38),
-              filled: true,
-              fillColor: AppTheme.cardBg,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(16),
-                borderSide: BorderSide.none,
-              ),
-            ),
-            onChanged: (_) => setState(() {}),
-          ),
-          const SizedBox(height: 20),
-          // Choix emoji
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Text('Avatar', style: TextStyle(color: Colors.white54, fontSize: 12)),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: UserProfile.availableEmojis.map((e) {
-              final selected = e == _selectedEmoji;
-              return GestureDetector(
-                onTap: () => setState(() => _selectedEmoji = e),
-                child: Container(
-                  width: 44, height: 44,
-                  decoration: BoxDecoration(
-                    color: selected
-                        ? _colors[_selectedColor].withValues(alpha: 0.3)
-                        : Colors.white.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: selected ? _colors[_selectedColor] : Colors.transparent,
-                      width: 2,
-                    ),
-                  ),
-                  child: Center(child: Text(e, style: const TextStyle(fontSize: 22))),
-                ),
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 20),
-          // Choix couleur
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Text('Couleur', style: TextStyle(color: Colors.white54, fontSize: 12)),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: List.generate(_colors.length, (i) {
-              final selected = i == _selectedColor;
-              return Expanded(
-                child: GestureDetector(
-                  onTap: () => setState(() => _selectedColor = i),
-                  child: Container(
-                    height: 32,
-                    margin: const EdgeInsets.symmetric(horizontal: 3),
-                    decoration: BoxDecoration(
-                      color: _colors[i],
-                      borderRadius: BorderRadius.circular(8),
-                      border: selected
-                          ? Border.all(color: Colors.white, width: 2)
-                          : null,
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 24),
-          // Bouton créer
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _controller.text.trim().isEmpty
-                  ? null
-                  : () async {
-                      final profile = await userProfileService.create(
-                        name: _controller.text.trim(),
-                        emoji: _selectedEmoji,
-                        colorIndex: _selectedColor,
-                      );
-                      if (context.mounted) {
-                        Navigator.pop(context);
-                        widget.onCreated(profile);
-                      }
-                    },
-              child: const Text('Créer le profil'),
-            ),
           ),
         ],
       ),

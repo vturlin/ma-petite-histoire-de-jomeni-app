@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/story_config.dart';
+import '../services/user_profile_service.dart';
 import '../theme/app_theme.dart';
+import '../widgets/profile_button.dart';
 import '../widgets/step_progress.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -14,17 +16,22 @@ class WelcomeScreen extends StatefulWidget {
 
 class _WelcomeScreenState extends State<WelcomeScreen> {
   final _controller = TextEditingController();
-  AgeCategory? _selected;
 
   @override
   void initState() {
     super.initState();
     _controller.text = widget.config.storyTitle;
-    _selected = widget.config.ageCategory;
+    // Pre-fill age from profile if not already set
+    if (widget.config.ageCategory == null) {
+      final profileAge = userProfileService.currentProfile?.age;
+      if (profileAge != null) {
+        widget.config.ageCategory = AgeCategory.values.firstWhere(
+          (a) => a.name == profileAge.name,
+          orElse: () => AgeCategory.child,
+        );
+      }
+    }
   }
-
-  bool get _canContinue =>
-      _controller.text.trim().isNotEmpty && _selected != null;
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +42,12 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const StepProgress(currentStep: 1, totalSteps: 6),
+              Row(
+                children: const [
+                  Expanded(child: StepProgress(currentStep: 1, totalSteps: 6)),
+                  ProfileButton(),
+                ],
+              ),
               const SizedBox(height: 32),
               const Text(
                 '✨ Créons ton histoire !',
@@ -73,76 +85,16 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                       const Icon(Icons.auto_stories, color: AppTheme.accent),
                 ),
               ),
-              const SizedBox(height: 32),
-              const Text(
-                'Quel âge a l\'enfant ?',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: GridView.count(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  children: AgeCategory.values.map((age) {
-                    final isSelected = _selected == age;
-                    return GestureDetector(
-                      onTap: () => setState(() => _selected = age),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        decoration: BoxDecoration(
-                          color: isSelected
-                              ? AppTheme.primary
-                              : AppTheme.cardBg,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: isSelected
-                                ? AppTheme.accent
-                                : Colors.white12,
-                            width: isSelected ? 2 : 1,
-                          ),
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(age.emoji,
-                                style: const TextStyle(fontSize: 40)),
-                            const SizedBox(height: 8),
-                            Text(
-                              age.label,
-                              style: TextStyle(
-                                color: isSelected
-                                    ? Colors.white
-                                    : Colors.white70,
-                                fontSize: 16,
-                                fontWeight: isSelected
-                                    ? FontWeight.bold
-                                    : FontWeight.normal,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-              const SizedBox(height: 16),
+              const Spacer(),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _canContinue
-                      ? () {
-                          widget.config.storyTitle =
-                              _controller.text.trim();
-                          widget.config.ageCategory = _selected;
+                  onPressed: _controller.text.trim().isEmpty
+                      ? null
+                      : () {
+                          widget.config.storyTitle = _controller.text.trim();
                           context.push('/character', extra: widget.config);
-                        }
-                      : null,
+                        },
                   child: const Text('Continuer →'),
                 ),
               ),
