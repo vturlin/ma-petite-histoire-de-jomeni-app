@@ -14,6 +14,7 @@ import 'screens/screen6_magic_object.dart';
 import 'screens/screen7_story.dart';
 import 'screens/screen_library.dart';
 import 'screens/screen_profiles.dart';
+import 'services/api_key_service.dart';
 import 'services/story_library_service.dart';
 import 'services/user_profile_service.dart';
 import 'theme/app_theme.dart';
@@ -88,7 +89,7 @@ final GoRouter _router = GoRouter(
       path: '/generating',
       builder: (context, state) => StoryScreen(
         config: state.extra as StoryConfig,
-        apiKey: dotenv.env['GEMINI_API_KEY'] ?? '',
+        apiKey: apiKeyService.key,
       ),
     ),
     // Bibliothèque
@@ -100,7 +101,7 @@ final GoRouter _router = GoRouter(
       path: '/play',
       builder: (context, state) => StoryScreen(
         savedStory: state.extra as SavedStory,
-        apiKey: dotenv.env['GEMINI_API_KEY'] ?? '',
+        apiKey: apiKeyService.key,
       ),
     ),
   ],

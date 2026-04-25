@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../models/user_profile.dart';
+import '../services/api_key_service.dart';
 import '../services/user_profile_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/profile_sheet.dart';
@@ -31,6 +32,45 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
   void initState() {
     super.initState();
     _load();
+    if (!apiKeyService.isSelected) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _selectApiKey());
+    }
+  }
+
+  Future<void> _selectApiKey() async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppTheme.cardBg,
+        title: const Text('🔑 Clé API à utiliser',
+            style: TextStyle(color: Colors.white, fontSize: 18)),
+        content: const Text(
+          'Choisis la clé Gemini pour cette session.',
+          style: TextStyle(color: Colors.white60, fontSize: 13),
+        ),
+        actions: [
+          _ApiKeyOption(
+            label: '🧪 Gemini API Key',
+            description: '…77kQ',
+            color: AppTheme.primary,
+            onTap: () {
+              apiKeyService.selectProduction();
+              Navigator.pop(context);
+            },
+          ),
+          _ApiKeyOption(
+            label: '🧪 Jomeni app test',
+            description: '…8OD4',
+            color: AppTheme.secondary,
+            onTap: () {
+              apiKeyService.selectTest();
+              Navigator.pop(context);
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   void _load() => setState(() => _profiles = userProfileService.getAll());
@@ -317,6 +357,57 @@ class _AddProfileCard extends StatelessWidget {
             style: TextStyle(color: Colors.white54, fontSize: 14),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Bouton de sélection de clé API ──────────────────────────────────────────
+
+class _ApiKeyOption extends StatelessWidget {
+  final String label;
+  final String description;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ApiKeyOption({
+    required this.label,
+    required this.description,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      child: SizedBox(
+        width: double.infinity,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: color.withValues(alpha: 0.5), width: 1.5),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: TextStyle(
+                        color: color,
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold)),
+                const SizedBox(height: 2),
+                Text(description,
+                    style: const TextStyle(
+                        color: Colors.white54, fontSize: 12)),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
