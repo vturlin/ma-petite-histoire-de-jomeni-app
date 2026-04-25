@@ -57,7 +57,6 @@ class _StoryScreenState extends State<StoryScreen> {
   List<String> _chunks = [];
   int _currentChunk = 0;
   final Map<int, Uint8List> _audioCache = {};
-  bool _isPregenerating = false;
 
   // ─── Sauvegarde ───────────────────────────────────────────────────────────
   bool _isSaved = false;
@@ -248,7 +247,8 @@ class _StoryScreenState extends State<StoryScreen> {
       });
 
       await _player.play(BytesSource(audio));
-      _pregenerateChunk(index + 1);
+      // Pas de pré-génération parallèle : la durée naturelle de lecture
+      // (~30-45s par chunk) espace suffisamment les appels API.
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -257,23 +257,6 @@ class _StoryScreenState extends State<StoryScreen> {
         _ttsError = 'Erreur audio : $e';
         _audioStatus = '';
       });
-    }
-  }
-
-  Future<void> _pregenerateChunk(int index) async {
-    if (index >= _chunks.length || _audioCache.containsKey(index) || _isPregenerating) return;
-    _isPregenerating = true;
-    try {
-      final tts = GeminiTtsService(widget.apiKey);
-      final audio = await tts.generateAudio(_chunks[index]);
-      if (!mounted) return;
-      _audioCache[index] = audio;
-      if (_isSaved && _storyId != null) {
-        await storyLibrary.saveAudioChunk(_storyId!, index, audio);
-      }
-    } catch (_) {
-    } finally {
-      _isPregenerating = false;
     }
   }
 
@@ -293,15 +276,27 @@ class _StoryScreenState extends State<StoryScreen> {
       _saveStatus = 'Génération audio en cours...';
     });
 
-    // Génère les chunks audio manquants
+    // Génère les chunks audio manquants séquentiellement
+    // (délai entre requêtes pour respecter la limite gratuite de l'API)
     final tts = GeminiTtsService(widget.apiKey);
     for (int i = 0; i < _chunks.length; i++) {
       if (!_audioCache.containsKey(i)) {
         setState(() => _saveStatus = 'Audio ${i + 1}/${_chunks.length}...');
         try {
+          if (i > 0) {
+            // Pause de 22s entre requêtes (limite free tier ≈ 3 req/min)
+            for (int s = 22; s > 0; s--) {
+              if (!mounted) return;
+              setState(() => _saveStatus = 'Audio ${i + 1}/${_chunks.length} (attente ${s}s...)');
+              await Future.delayed(const Duration(seconds: 1));
+            }
+          }
+          if (!mounted) return;
+          setState(() => _saveStatus = 'Audio ${i + 1}/${_chunks.length}...');
           final audio = await tts.generateAudio(_chunks[i]);
           _audioCache[i] = audio;
         } catch (e) {
+          if (!mounted) return;
           setState(() {
             _isSaving = false;
             _ttsError = 'Erreur génération audio : $e';

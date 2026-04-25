@@ -12,46 +12,62 @@ class GeminiTtsService {
 
   GeminiTtsService(this.apiKey);
 
-  Future<Uint8List> generateAudio(String text) async {
+  Future<Uint8List> generateAudio(String text, {int maxRetries = 3}) async {
     final url = Uri.parse(
       'https://generativelanguage.googleapis.com/v1beta/models/'
       'gemini-3.1-flash-tts-preview:generateContent?key=$apiKey',
     );
 
-    debugPrint('TTS → envoi requête (${text.length} chars)...');
+    final body = jsonEncode({
+      'contents': [
+        {
+          'parts': [{'text': text}],
+        }
+      ],
+      'generationConfig': {
+        'responseModalities': ['AUDIO'],
+        'speechConfig': {
+          'voiceConfig': {
+            'prebuiltVoiceConfig': {'voiceName': _voice},
+          },
+        },
+      },
+    });
 
-    http.Response response;
-    try {
-      response = await http
-          .post(
-            url,
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'contents': [
-                {
-                  'parts': [{'text': text}],
-                }
-              ],
-              'generationConfig': {
-                'responseModalities': ['AUDIO'],
-                'speechConfig': {
-                  'voiceConfig': {
-                    'prebuiltVoiceConfig': {'voiceName': _voice},
-                  },
-                },
-              },
-            }),
-          )
-          .timeout(_timeout);
-    } on TimeoutException {
-      throw Exception('TTS timeout (>${_timeout.inSeconds}s) — texte trop long ?');
+    http.Response? response;
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      debugPrint('TTS → tentative $attempt/$maxRetries (${text.length} chars)...');
+      try {
+        response = await http
+            .post(url, headers: {'Content-Type': 'application/json'}, body: body)
+            .timeout(_timeout);
+      } on TimeoutException {
+        throw Exception('TTS timeout (>${_timeout.inSeconds}s)');
+      }
+
+      debugPrint('TTS → HTTP ${response.statusCode}');
+
+      if (response.statusCode == 200) {
+        // Succès — on sort de la boucle
+        break;
+      }
+
+      if (response.statusCode == 429) {
+        // Rate limit : on lit le délai suggéré par l'API
+        final retryDelay = _parseRetryDelay(response.body);
+        debugPrint('TTS → 429 rate limit, attente ${retryDelay}s...');
+        if (attempt < maxRetries) {
+          await Future.delayed(Duration(seconds: retryDelay));
+          continue;
+        }
+      }
+
+      // Erreur non récupérable
+      throw Exception('TTS HTTP ${response.statusCode}: ${response.body}');
     }
 
-    debugPrint('TTS → status HTTP : ${response.statusCode}');
-    debugPrint('TTS → taille réponse : ${response.bodyBytes.length} bytes');
-
-    if (response.statusCode != 200) {
-      throw Exception('TTS HTTP ${response.statusCode}: ${response.body}');
+    if (response == null || response.statusCode != 200) {
+      throw Exception('TTS : échec après $maxRetries tentatives.');
     }
 
     final Map<String, dynamic> data;
@@ -95,6 +111,17 @@ class GeminiTtsService {
     );
 
     return _pcmToWav(pcmFinal, sampleRate: targetRate);
+  }
+
+  /// Extrait le délai de retry suggéré par l'API (en secondes) depuis le body 429.
+  int _parseRetryDelay(String body) {
+    try {
+      final match = RegExp(r'retry in (\d+(?:\.\d+)?)s').firstMatch(body);
+      if (match != null) {
+        return (double.parse(match.group(1)!) + 1).ceil();
+      }
+    } catch (_) {}
+    return 25; // délai par défaut si non parseable
   }
 
   /// Downsample PCM 16-bit mono de 24kHz à 16kHz (ratio 2/3).
