@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../services/user_profile_service.dart';
-import '../theme/app_theme.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_dimens.dart';
+import '../theme/app_text_styles.dart';
 import 'profile_sheet.dart';
 
 class ProfileButton extends StatefulWidget {
@@ -18,26 +20,27 @@ class _ProfileButtonState extends State<ProfileButton> {
     return GestureDetector(
       onTap: _showOptions,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.s12, vertical: AppSpacing.s8),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white12),
+          color: Colors.white,
+          borderRadius: AppRadius.all(AppRadius.pill),
+          border: Border.all(color: AppColors.line, width: 1.5),
+          boxShadow: AppShadows.soft,
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              profile?.emoji ?? '👤',
-              style: const TextStyle(fontSize: 14),
-            ),
-            const SizedBox(width: 5),
+            Text(profile?.emoji ?? '👤',
+                style: const TextStyle(fontSize: 16)),
+            const SizedBox(width: AppSpacing.s4),
             Text(
               profile?.name ?? 'Invité',
-              style: const TextStyle(color: Colors.white70, fontSize: 12),
+              style: AppText.labelLarge,
             ),
-            const SizedBox(width: 3),
-            const Icon(Icons.expand_more, color: Colors.white38, size: 14),
+            const SizedBox(width: AppSpacing.s4),
+            const Icon(Icons.expand_more,
+                color: AppColors.inkMute, size: 16),
           ],
         ),
       ),
@@ -49,29 +52,29 @@ class _ProfileButtonState extends State<ProfileButton> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (_) => Container(
-        margin: const EdgeInsets.all(16),
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        margin: const EdgeInsets.all(AppSpacing.s16),
+        padding: const EdgeInsets.symmetric(vertical: AppSpacing.s8),
         decoration: BoxDecoration(
-          color: AppTheme.surface,
-          borderRadius: BorderRadius.circular(24),
+          color: Colors.white,
+          borderRadius: AppRadius.all(AppRadius.xxl),
+          boxShadow: AppShadows.soft,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 36, height: 4,
-              margin: const EdgeInsets.only(bottom: 12),
+              width: 36,
+              height: 4,
+              margin: const EdgeInsets.only(bottom: AppSpacing.s12),
               decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(2),
+                color: AppColors.line,
+                borderRadius: AppRadius.all(AppRadius.pill),
               ),
             ),
             ListTile(
-              leading: const Icon(Icons.swap_horiz, color: Colors.white70),
-              title: const Text(
-                'Changer de profil',
-                style: TextStyle(color: Colors.white),
-              ),
+              leading: const Icon(Icons.swap_horiz,
+                  color: AppColors.inkSoft),
+              title: Text('Changer de profil', style: AppText.bodyLarge),
               onTap: () {
                 Navigator.pop(context);
                 context.push('/profiles');
@@ -79,11 +82,9 @@ class _ProfileButtonState extends State<ProfileButton> {
             ),
             if (userProfileService.currentProfile != null)
               ListTile(
-                leading: const Icon(Icons.edit_outlined, color: Colors.white70),
-                title: const Text(
-                  'Modifier mon profil',
-                  style: TextStyle(color: Colors.white),
-                ),
+                leading: const Icon(Icons.edit_outlined,
+                    color: AppColors.inkSoft),
+                title: Text('Modifier mon profil', style: AppText.bodyLarge),
                 onTap: () {
                   Navigator.pop(context);
                   _showEditSheet();

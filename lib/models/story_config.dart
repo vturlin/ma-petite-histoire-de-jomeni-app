@@ -42,8 +42,8 @@ enum StoryTheme {
   dinosaur('Dinosaures', '🦕'),
   jungle('Animaux de la jungle', '🦁'),
   pokemon('Pokémon', '⚡'),
-  dragonball('Dragon Ball', '🐉'),
-  disney('Disney', '✨'),
+  dragonball('Dragon Ball', '🥋'),
+  disney('Disney', '🐭'),
   knight('Chevaliers & Princesses', '⚔️');
 
   final String label;

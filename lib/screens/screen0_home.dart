@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../services/story_library_service.dart';
-import '../theme/app_theme.dart';
+import '../services/user_profile_service.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_dimens.dart';
+import '../theme/app_text_styles.dart';
 import '../widgets/profile_button.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -29,87 +32,221 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final profile = userProfileService.currentProfile;
+
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppTheme.surface, AppTheme.background],
+      backgroundColor: AppColors.paper,
+      body: Stack(
+        children: [
+          // Blobs décoratifs
+          Positioned(
+            top: -60, right: -60,
+            child: Container(
+              width: 220, height: 220,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.accent1.withValues(alpha: 0.45),
+              ),
+            ),
           ),
-        ),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
-            child: Column(
-              children: [
-                const Spacer(),
-                // Logo + titre
-                Column(
+          Positioned(
+            bottom: -80, left: -60,
+            child: Container(
+              width: 240, height: 240,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.sky.withValues(alpha: 0.5),
+              ),
+            ),
+          ),
+          // Contenu
+          SafeArea(
+            child: Padding(
+              padding: AppSpacing.screenH,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: AppSpacing.s16),
+                  // Top bar
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const ProfileButton(),
+                      _RoundIconBtn(
+                        icon: Icons.library_books_outlined,
+                        onTap: _savedCount == 0
+                            ? null
+                            : () => context.push('/library'),
+                      ),
+                    ],
+                  ).animate().fadeIn(duration: 400.ms),
+                  const Spacer(),
+                  // Avatar
+                  Center(
+                    child: Container(
+                      width: AppSize.avatarLg + 44,
+                      height: AppSize.avatarLg + 44,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [AppColors.accentSoft, AppColors.accent1],
+                        ),
+                        boxShadow: AppShadows.cta,
+                      ),
+                      child: Center(
+                        child: Text(
+                          profile?.emoji ?? '📖',
+                          style: const TextStyle(fontSize: 64),
+                        ),
+                      ),
+                    ),
+                  ).animate().scale(
+                        duration: 600.ms,
+                        curve: Curves.elasticOut,
+                        delay: 100.ms,
+                      ),
+                  const SizedBox(height: AppSpacing.s24),
+                  // Salutation
+                  Center(
+                    child: Column(
+                      children: [
+                        Text(
+                          'Bonjour, ${profile?.name ?? 'toi'} !',
+                          style: AppText.displayLarge,
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: AppSpacing.s8),
+                        Text(
+                          'Que veux-tu faire aujourd\'hui ?',
+                          style: AppText.bodyMedium,
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ).animate().fadeIn(delay: 200.ms),
+                  const Spacer(),
+                  // Card "Créer une histoire"
+                  _HomeCard(
+                    bgColor: AppColors.accent1,
+                    iconBg: AppColors.accentSoft,
+                    icon: Icons.auto_fix_high,
+                    title: 'Créer une histoire',
+                    subtitle: 'Une nouvelle aventure',
+                    onTap: () => context.push('/create'),
+                  ).animate().slideY(begin: 0.3, delay: 400.ms, duration: 400.ms)
+                      .fadeIn(delay: 400.ms),
+                  const SizedBox(height: AppSpacing.s16),
+                  // Card "Écouter une histoire"
+                  _HomeCard(
+                    bgColor: Colors.white,
+                    iconBg: AppColors.sky,
+                    icon: Icons.headphones,
+                    title: 'Écouter une histoire',
+                    subtitle: _savedCount == 0
+                        ? 'Aucune histoire sauvegardée'
+                        : '$_savedCount histoire${_savedCount > 1 ? 's' : ''} sauvegardée${_savedCount > 1 ? 's' : ''}',
+                    onTap: _savedCount == 0 ? null : () => context.push('/library'),
+                    bordered: true,
+                  ).animate().slideY(begin: 0.3, delay: 500.ms, duration: 400.ms)
+                      .fadeIn(delay: 500.ms),
+                  const SizedBox(height: AppSpacing.s32),
+                  // Footer
+                  Center(
+                    child: Text(
+                      'Propulsé par Gemini AI',
+                      style: AppText.bodySmall
+                          .copyWith(color: AppColors.inkMute),
+                    ),
+                  ).animate().fadeIn(delay: 700.ms),
+                  const SizedBox(height: AppSpacing.s16),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Card d'action ─────────────────────────────────────────────────────────────
+
+class _HomeCard extends StatelessWidget {
+  final Color bgColor;
+  final Color iconBg;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+  final bool bordered;
+
+  const _HomeCard({
+    required this.bgColor,
+    required this.iconBg,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.onTap,
+    this.bordered = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = onTap == null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Opacity(
+        opacity: disabled ? 0.5 : 1.0,
+        child: Container(
+          width: double.infinity,
+          constraints: const BoxConstraints(minHeight: 96),
+          padding: const EdgeInsets.all(AppSpacing.s20),
+          decoration: BoxDecoration(
+            color: bgColor,
+            borderRadius: AppRadius.all(AppRadius.xl),
+            border: bordered
+                ? Border.all(color: AppColors.line, width: 2)
+                : null,
+            boxShadow: AppShadows.soft,
+          ),
+          child: Row(
+            children: [
+              // Icône
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: iconBg,
+                  borderRadius: AppRadius.all(AppRadius.md),
+                ),
+                child: Icon(icon, color: AppColors.accent2, size: 28),
+              ),
+              const SizedBox(width: AppSpacing.s16),
+              // Texte
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text('📖', style: TextStyle(fontSize: 72))
-                        .animate()
-                        .scale(duration: 600.ms, curve: Curves.elasticOut),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Ma petite histoire',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ).animate().fadeIn(delay: 200.ms),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'de Jomeni',
-                      style: TextStyle(
-                        color: AppTheme.accent,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ).animate().fadeIn(delay: 300.ms),
-                    const SizedBox(height: 10),
-                    const Text(
-                      'Des histoires magiques créées\nrien que pour toi ✨',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white54, fontSize: 15, height: 1.5),
-                    ).animate().fadeIn(delay: 400.ms),
+                    Text(title, style: AppText.titleLarge),
+                    const SizedBox(height: 2),
+                    Text(subtitle, style: AppText.bodyMedium),
                   ],
                 ),
-                const Spacer(),
-                // Bouton "Créer une histoire"
-                _HomeButton(
-                  emoji: '🎨',
-                  title: 'Créer une histoire',
-                  subtitle: 'Invente une nouvelle aventure',
-                  color: AppTheme.primary,
-                  onTap: () => context.push('/create'),
-                ).animate().slideY(begin: 0.3, delay: 500.ms, duration: 400.ms)
-                    .fadeIn(delay: 500.ms),
-                const SizedBox(height: 16),
-                // Bouton "Écouter une histoire"
-                _HomeButton(
-                  emoji: '🎧',
-                  title: 'Écouter une histoire',
-                  subtitle: _savedCount == 0
-                      ? 'Aucune histoire sauvegardée'
-                      : '$_savedCount histoire${_savedCount > 1 ? 's' : ''} sauvegardée${_savedCount > 1 ? 's' : ''}',
-                  color: _savedCount == 0 ? Colors.grey.shade700 : AppTheme.secondary,
-                  onTap: _savedCount == 0 ? null : () => context.push('/library'),
-                ).animate().slideY(begin: 0.3, delay: 600.ms, duration: 400.ms)
-                    .fadeIn(delay: 600.ms),
-                const Spacer(),
-                // Profil actif
-                const ProfileButton().animate().fadeIn(delay: 700.ms),
-                const SizedBox(height: 6),
-                const Text(
-                  'Propulsé par Gemini AI',
-                  style: TextStyle(color: Colors.white24, fontSize: 11),
-                ).animate().fadeIn(delay: 800.ms),
-                const SizedBox(height: 8),
-              ],
-            ),
+              ),
+              // Chevron
+              Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.chevron_right,
+                    color: AppColors.inkSoft, size: 20),
+              ),
+            ],
           ),
         ),
       ),
@@ -117,70 +254,30 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class _HomeButton extends StatelessWidget {
-  final String emoji;
-  final String title;
-  final String subtitle;
-  final Color color;
+// ── Bouton icône rond ─────────────────────────────────────────────────────────
+
+class _RoundIconBtn extends StatelessWidget {
+  final IconData icon;
   final VoidCallback? onTap;
 
-  const _HomeButton({
-    required this.emoji,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    this.onTap,
-  });
+  const _RoundIconBtn({required this.icon, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: onTap == null ? Colors.white.withValues(alpha: 0.08) : color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: onTap == null ? Colors.white12 : color.withValues(alpha: 0.5),
-            width: 1.5,
+      child: Opacity(
+        opacity: onTap == null ? 0.35 : 1.0,
+        child: Container(
+          width: AppSize.iconBtnTopbar,
+          height: AppSize.iconBtnTopbar,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.line, width: 1.5),
+            boxShadow: AppShadows.soft,
           ),
-        ),
-        child: Row(
-          children: [
-            Text(emoji, style: const TextStyle(fontSize: 36)),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      color: onTap == null ? Colors.white38 : Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      color: onTap == null ? Colors.white24 : Colors.white60,
-                      fontSize: 13,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios,
-              color: onTap == null ? Colors.white12 : color,
-              size: 18,
-            ),
-          ],
+          child: Icon(icon, color: AppColors.ink, size: 20),
         ),
       ),
     );

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/story_config.dart';
-import '../widgets/profile_button.dart';
-import '../widgets/step_progress.dart';
+import '../theme/app_colors.dart';
 import '../widgets/choice_card.dart';
+import '../widgets/wizard_scaffold.dart';
 
 class ThemeScreen extends StatefulWidget {
   final StoryConfig config;
@@ -16,6 +16,16 @@ class ThemeScreen extends StatefulWidget {
 class _ThemeScreenState extends State<ThemeScreen> {
   StoryTheme? _selected;
 
+  // Couleur de fond par univers
+  static const _bgColors = [
+    AppColors.butter,   // Dinosaures
+    AppColors.mint,     // Jungle
+    AppColors.sky,      // Pokémon
+    AppColors.rose,     // Dragon Ball
+    AppColors.lilac,    // Disney
+    AppColors.moss,     // Chevaliers
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -24,73 +34,43 @@ class _ThemeScreenState extends State<ThemeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: const [
-                  Expanded(child: StepProgress(currentStep: 4, totalSteps: 6)),
-                  ProfileButton(),
-                ],
-              ),
-              const SizedBox(height: 32),
-              const Text(
-                '🌍 Choisis ton univers',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Dans quel monde se passe l\'aventure ?',
-                style: TextStyle(color: Colors.white60, fontSize: 16),
-              ),
-              const SizedBox(height: 24),
-              Expanded(
-                child: GridView.count(
-                  crossAxisCount: 2,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  children: StoryTheme.values.map((theme) {
-                    return ChoiceCard(
-                      emoji: theme.emoji,
-                      label: theme.label,
-                      isSelected: _selected == theme,
-                      onTap: () => setState(() => _selected = theme),
-                    );
-                  }).toList(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: () => context.pop(),
-                    child: const Text('← Retour',
-                        style: TextStyle(color: Colors.white54)),
-                  ),
-                  const Spacer(),
-                  ElevatedButton(
-                    onPressed: _selected != null
-                        ? () {
-                            widget.config.theme = _selected;
-                            context.push('/story-type',
-                                extra: widget.config);
-                          }
-                        : null,
-                    child: const Text('Continuer →'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+    return WizardScaffold(
+      step: 4,
+      pastilleColor: AppColors.mint,
+      pastilleIcon: Icons.public,
+      title: 'Choisis l\'univers',
+      subtitle: 'Dans quel monde se passe l\'aventure ?',
+      voiceInstruction:
+          'Dans quel univers se passe ton histoire ? Choisis le monde de ton aventure.',
+      canContinue: _selected != null,
+      onContinue: () {
+        widget.config.theme = _selected;
+        context.push('/story-type', extra: widget.config);
+      },
+      content: GridView.count(
+        crossAxisCount: 2,
+        mainAxisSpacing: 12,
+        crossAxisSpacing: 12,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        children: List.generate(StoryTheme.values.length, (i) {
+          final theme = StoryTheme.values[i];
+          final imageAsset = switch (theme) {
+            StoryTheme.pokemon    => 'assets/illus/pikachu.png',
+            StoryTheme.dragonball => 'assets/illus/sangoku.png',
+            StoryTheme.disney     => 'assets/illus/mickey.png',
+            _                     => null,
+          };
+          return ChoiceCard(
+            emoji: theme.emoji,
+            label: theme.label,
+            isSelected: _selected == theme,
+            bgColor: _bgColors[i % _bgColors.length],
+            emojiSize: 60,
+            imageAsset: imageAsset,
+            onTap: () => setState(() => _selected = theme),
+          );
+        }),
       ),
     );
   }

@@ -2,9 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import '../models/story_config.dart';
-import '../theme/app_theme.dart';
-import '../widgets/profile_button.dart';
-import '../widgets/step_progress.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_dimens.dart';
+import '../theme/app_text_styles.dart';
+import '../widgets/wizard_scaffold.dart';
 
 class HeroNameScreen extends StatefulWidget {
   final StoryConfig config;
@@ -47,11 +48,7 @@ class _HeroNameScreenState extends State<HeroNameScreen> {
       setState(() => _isListening = true);
       await _speech.listen(
         onResult: (result) {
-          if (mounted) {
-            setState(() {
-              _controller.text = result.recognizedWords;
-            });
-          }
+          if (mounted) setState(() => _controller.text = result.recognizedWords);
         },
         localeId: 'fr_FR',
       );
@@ -60,129 +57,72 @@ class _HeroNameScreenState extends State<HeroNameScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: const [
-                  Expanded(child: StepProgress(currentStep: 3, totalSteps: 6)),
-                  ProfileButton(),
-                ],
-              ),
-              const SizedBox(height: 32),
-              const Text(
-                '🎤 Nomme ton héros',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Dis ou écris le nom de ton héros',
-                style: TextStyle(color: Colors.white60, fontSize: 16),
-              ),
-              const SizedBox(height: 40),
-              TextField(
-                controller: _controller,
-                onChanged: (_) => setState(() {}),
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold),
-                textAlign: TextAlign.center,
-                decoration: InputDecoration(
-                  hintText: 'ex: Léo, Emma, Zara...',
-                  hintStyle: const TextStyle(color: Colors.white30),
-                  filled: true,
-                  fillColor: AppTheme.cardBg,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide: BorderSide.none,
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    borderSide:
-                        const BorderSide(color: AppTheme.primary, width: 2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 32),
-              Center(
-                child: GestureDetector(
-                  onTap: _speechAvailable ? _toggleListening : null,
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    width: 100,
-                    height: 100,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _isListening
-                          ? AppTheme.secondary
-                          : AppTheme.primary,
-                      boxShadow: _isListening
-                          ? [
-                              BoxShadow(
-                                color: AppTheme.secondary.withValues(alpha: 0.5),
-                                blurRadius: 20,
-                                spreadRadius: 5,
-                              )
-                            ]
-                          : [],
-                    ),
-                    child: Icon(
-                      _isListening ? Icons.mic : Icons.mic_none,
-                      color: Colors.white,
-                      size: 44,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Center(
-                child: Text(
-                  _isListening
-                      ? 'J\'écoute...'
-                      : _speechAvailable
-                          ? 'Appuie pour parler'
-                          : 'Micro non disponible',
-                  style: TextStyle(
-                    color: _isListening
-                        ? AppTheme.secondary
-                        : Colors.white54,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-              const Spacer(),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: () => context.pop(),
-                    child: const Text('← Retour',
-                        style: TextStyle(color: Colors.white54)),
-                  ),
-                  const Spacer(),
-                  ElevatedButton(
-                    onPressed: _controller.text.trim().isNotEmpty
-                        ? () {
-                            widget.config.heroName =
-                                _controller.text.trim();
-                            context.push('/theme', extra: widget.config);
-                          }
-                        : null,
-                    child: const Text('Continuer →'),
-                  ),
-                ],
-              ),
-            ],
+    return WizardScaffold(
+      step: 3,
+      pastilleColor: AppColors.lilac,
+      pastilleIcon: Icons.mic_none,
+      title: 'Nomme ton héros',
+      subtitle: 'Dis ou écris le nom de ton héros',
+      voiceInstruction: 'Comment s\'appelle ton héros ? Tu peux le dire à voix haute ou l\'écrire.',
+      canContinue: _controller.text.trim().isNotEmpty,
+      onContinue: () {
+        widget.config.heroName = _controller.text.trim();
+        context.push('/theme', extra: widget.config);
+      },
+      content: Column(
+        children: [
+          // Input
+          TextField(
+            controller: _controller,
+            onChanged: (_) => setState(() {}),
+            style: AppText.titleLarge,
+            textAlign: TextAlign.center,
+            decoration: const InputDecoration(
+              hintText: 'ex: Léo, Emma, Zara…',
+            ),
           ),
-        ),
+          const SizedBox(height: AppSpacing.s40),
+          // Bouton micro
+          Center(
+            child: GestureDetector(
+              onTap: _speechAvailable ? _toggleListening : null,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 88,
+                height: 88,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: _isListening
+                      ? AppColors.accent2
+                      : AppColors.accentSoft,
+                  boxShadow: _isListening ? AppShadows.cta : AppShadows.soft,
+                ),
+                child: Icon(
+                  _isListening ? Icons.mic : Icons.mic_none,
+                  color: _isListening
+                      ? Colors.white
+                      : AppColors.accent2,
+                  size: 38,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.s12),
+          Center(
+            child: Text(
+              _isListening
+                  ? 'J\'écoute…'
+                  : _speechAvailable
+                      ? 'Appuie pour parler'
+                      : 'Micro non disponible',
+              style: AppText.bodySmall.copyWith(
+                color: _isListening
+                    ? AppColors.accent2
+                    : AppColors.inkMute,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

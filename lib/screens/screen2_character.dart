@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../models/story_config.dart';
-import '../widgets/profile_button.dart';
-import '../widgets/step_progress.dart';
+import '../services/user_profile_service.dart';
+import '../theme/app_colors.dart';
 import '../widgets/choice_card.dart';
+import '../widgets/wizard_scaffold.dart';
 
 class CharacterScreen extends StatefulWidget {
   final StoryConfig config;
@@ -16,6 +17,11 @@ class CharacterScreen extends StatefulWidget {
 class _CharacterScreenState extends State<CharacterScreen> {
   CharacterType? _selected;
 
+  static const _bgColors = [
+    AppColors.rose,
+    AppColors.accentSoft,
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -24,79 +30,53 @@ class _CharacterScreenState extends State<CharacterScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: const [
-                  Expanded(child: StepProgress(currentStep: 2, totalSteps: 6)),
-                  ProfileButton(),
-                ],
+    // Emoji du profil actif pour l'option "Moi-même"
+    final profileEmoji =
+        userProfileService.currentProfile?.emoji ?? '🧒';
+
+    return WizardScaffold(
+      step: 2,
+      pastilleColor: AppColors.rose,
+      pastilleIcon: Icons.person_outline,
+      title: 'Qui est le héros ?',
+      subtitle: 'Choisis le personnage principal de l\'histoire',
+      voiceInstruction:
+          'Qui est le héros de ton histoire ? Toi-même, ou un autre personnage ?',
+      canContinue: _selected != null,
+      onContinue: () {
+        widget.config.characterType = _selected;
+        if (_selected == CharacterType.hero) {
+          context.push('/hero-name', extra: widget.config);
+        } else {
+          context.push('/theme', extra: widget.config);
+        }
+      },
+      content: Row(
+        children: List.generate(CharacterType.values.length, (i) {
+          final type = CharacterType.values[i];
+          // Remplace l'emoji générique par l'avatar du profil pour "Moi-même"
+          final emoji =
+              type == CharacterType.myself ? profileEmoji : type.emoji;
+          return Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(
+                left: i == 0 ? 0 : 8,
+                right: i == CharacterType.values.length - 1 ? 0 : 8,
               ),
-              const SizedBox(height: 32),
-              const Text(
-                '🦸 Qui est le héros ?',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
+              child: AspectRatio(
+                aspectRatio: 0.85,
+                child: ChoiceCard(
+                  emoji: emoji,
+                  label: type.label,
+                  isSelected: _selected == type,
+                  bgColor: _bgColors[i % _bgColors.length],
+                  emojiSize: 68,
+                  onTap: () => setState(() => _selected = type),
                 ),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Choisis le personnage principal de l\'histoire',
-                style: TextStyle(color: Colors.white60, fontSize: 16),
-              ),
-              const SizedBox(height: 40),
-              Expanded(
-                child: Row(
-                  children: CharacterType.values.map((type) {
-                    return Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: ChoiceCard(
-                          emoji: type.emoji,
-                          label: type.label,
-                          isSelected: _selected == type,
-                          onTap: () => setState(() => _selected = type),
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-              const SizedBox(height: 32),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: () => context.pop(),
-                    child: const Text('← Retour',
-                        style: TextStyle(color: Colors.white54)),
-                  ),
-                  const Spacer(),
-                  ElevatedButton(
-                    onPressed: _selected != null
-                        ? () {
-                            widget.config.characterType = _selected;
-                            if (_selected == CharacterType.hero) {
-                              context.push('/hero-name',
-                                  extra: widget.config);
-                            } else {
-                              context.push('/theme', extra: widget.config);
-                            }
-                          }
-                        : null,
-                    child: const Text('Continuer →'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+            ),
+          );
+        }),
       ),
     );
   }

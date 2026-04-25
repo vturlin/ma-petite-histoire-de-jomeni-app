@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'models/saved_story.dart';
 import 'models/story_config.dart';
 import 'screens/screen0_home.dart';
@@ -25,6 +27,11 @@ void main() async {
   await Hive.initFlutter();
   await UserProfileService.init();
   await StoryLibraryService.init();
+  if (!kIsWeb) {
+    await [
+      Permission.microphone,
+    ].request();
+  }
   runApp(const JomeniApp());
 }
 
@@ -36,7 +43,7 @@ class JomeniApp extends StatelessWidget {
     return MaterialApp.router(
       title: 'Ma petite histoire de Jomeni',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.theme,
+      theme: AppTheme.light(),
       routerConfig: _router,
     );
   }

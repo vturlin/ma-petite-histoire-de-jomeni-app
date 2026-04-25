@@ -1,4 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Accès réseau pour l'API Gemini -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Microphone pour la dictée vocale -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+
     <application
         android:label="jomeni_app"
         android:name="${applicationName}"

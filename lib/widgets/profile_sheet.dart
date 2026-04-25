@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/user_profile.dart';
 import '../services/user_profile_service.dart';
-import '../theme/app_theme.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_dimens.dart';
+import '../theme/app_text_styles.dart';
 
 class ProfileSheet extends StatefulWidget {
   final UserProfile? existingProfile;
@@ -28,9 +30,14 @@ class _ProfileSheetState extends State<ProfileSheet> {
   bool get _isEdit => widget.existingProfile != null;
 
   static const List<Color> _colors = [
-    Color(0xFF6C3CE1), Color(0xFFFF6B6B), Color(0xFF4ECDC4),
-    Color(0xFFFFD93D), Color(0xFF95E1D3), Color(0xFFF38181),
-    Color(0xFF3D5A80), Color(0xFFE8A87C),
+    AppColors.rose,
+    AppColors.accentSoft,
+    AppColors.butter,
+    AppColors.sky,
+    AppColors.lilac,
+    AppColors.mint,
+    AppColors.moss,
+    AppColors.accent1,
   ];
 
   @override
@@ -57,16 +64,18 @@ class _ProfileSheetState extends State<ProfileSheet> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          backgroundColor: AppTheme.cardBg,
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+              borderRadius: AppRadius.all(AppRadius.xl)),
           title: Row(
             children: [
               Text(widget.existingProfile!.emoji,
                   style: const TextStyle(fontSize: 22)),
-              const SizedBox(width: 8),
+              const SizedBox(width: AppSpacing.s8),
               Expanded(
                 child: Text(
                   'Supprimer ${widget.existingProfile!.name} ?',
-                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                  style: AppText.titleLarge,
                 ),
               ),
             ],
@@ -75,30 +84,19 @@ class _ProfileSheetState extends State<ProfileSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Cette action est irréversible. Toutes les histoires de ce profil seront supprimées.',
-                style: TextStyle(color: Colors.white70, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
               Text(
-                'Tape  "$phrase"  pour confirmer :',
-                style: const TextStyle(color: Colors.white54, fontSize: 12),
+                'Cette action est irréversible. Toutes les histoires seront supprimées.',
+                style: AppText.bodyMedium,
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.s16),
+              Text('Tape "$phrase" pour confirmer :',
+                  style: AppText.bodySmall),
+              const SizedBox(height: AppSpacing.s8),
               TextField(
                 controller: confirmController,
                 autofocus: true,
-                style: const TextStyle(color: Colors.white, fontSize: 14),
-                decoration: InputDecoration(
-                  hintText: phrase,
-                  hintStyle: const TextStyle(color: Colors.white24),
-                  filled: true,
-                  fillColor: AppTheme.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
+                style: AppText.bodyLarge,
+                decoration: InputDecoration(hintText: phrase),
                 onChanged: (_) => setDialogState(() {}),
               ),
             ],
@@ -109,24 +107,27 @@ class _ProfileSheetState extends State<ProfileSheet> {
                 confirmController.dispose();
                 Navigator.pop(ctx);
               },
-              child: const Text('Annuler',
-                  style: TextStyle(color: Colors.white54)),
+              child: Text('Annuler',
+                  style: AppText.labelLarge
+                      .copyWith(color: AppColors.inkSoft)),
             ),
             TextButton(
-              onPressed: confirmController.text.trim().toLowerCase() == phrase
-                  ? () async {
-                      confirmController.dispose();
-                      Navigator.pop(ctx);
-                      final nav = Navigator.of(context);
-                      final onDeleted = widget.onDeleted;
-                      await userProfileService
-                          .delete(widget.existingProfile!.id);
-                      nav.pop();
-                      onDeleted?.call();
-                    }
-                  : null,
-              child: const Text('Supprimer définitivement',
-                  style: TextStyle(color: Colors.redAccent)),
+              onPressed:
+                  confirmController.text.trim().toLowerCase() == phrase
+                      ? () async {
+                          confirmController.dispose();
+                          Navigator.pop(ctx);
+                          final nav = Navigator.of(context);
+                          final onDeleted = widget.onDeleted;
+                          await userProfileService
+                              .delete(widget.existingProfile!.id);
+                          nav.pop();
+                          onDeleted?.call();
+                        }
+                      : null,
+              child: Text('Supprimer définitivement',
+                  style: AppText.labelLarge
+                      .copyWith(color: const Color(0xFFB3261E))),
             ),
           ],
         ),
@@ -136,94 +137,106 @@ class _ProfileSheetState extends State<ProfileSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final accentColor = _colors[_selectedColor % _colors.length];
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.all(AppSpacing.s16),
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-        top: 24, left: 24, right: 24,
+        bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.s16,
+        top: AppSpacing.s24,
+        left: AppSpacing.s24,
+        right: AppSpacing.s24,
       ),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
-        borderRadius: BorderRadius.circular(28),
+        color: Colors.white,
+        borderRadius: AppRadius.all(AppRadius.xxl),
+        boxShadow: AppShadows.soft,
       ),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Handle
+            Container(
+              width: 36, height: 4,
+              margin: const EdgeInsets.only(bottom: AppSpacing.s16),
+              decoration: BoxDecoration(
+                color: AppColors.line,
+                borderRadius: AppRadius.all(AppRadius.pill),
+              ),
+            ),
+            // Titre
             Text(
               _isEdit ? 'Modifier le profil' : 'Nouveau profil',
-              style: const TextStyle(
-                color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold,
-              ),
+              style: AppText.titleLarge,
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.s20),
+            // Aperçu avatar
             Container(
-              width: 80, height: 80,
+              width: 88, height: 88,
               decoration: BoxDecoration(
-                color: _colors[_selectedColor].withValues(alpha: 0.25),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: _colors[_selectedColor], width: 2),
+                color: accentColor,
+                borderRadius: AppRadius.all(AppRadius.lg),
+                boxShadow: AppShadows.soft,
               ),
               child: Center(
-                child: Text(_selectedEmoji, style: const TextStyle(fontSize: 40)),
+                child: Text(_selectedEmoji,
+                    style: const TextStyle(fontSize: 44)),
               ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: AppSpacing.s20),
+            // Nom
             TextField(
               controller: _controller,
               autofocus: !_isEdit,
-              style: const TextStyle(color: Colors.white, fontSize: 18),
+              style: AppText.titleMedium,
               textAlign: TextAlign.center,
-              decoration: InputDecoration(
-                hintText: 'Prénom',
-                hintStyle: const TextStyle(color: Colors.white38),
-                filled: true,
-                fillColor: AppTheme.cardBg,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide.none,
-                ),
-              ),
+              decoration: const InputDecoration(hintText: 'Prénom'),
               onChanged: (_) => setState(() {}),
             ),
-            const SizedBox(height: 20),
-            const Align(
+            const SizedBox(height: AppSpacing.s20),
+            // Emoji
+            Align(
               alignment: Alignment.centerLeft,
-              child: Text('Avatar', style: TextStyle(color: Colors.white54, fontSize: 12)),
+              child: Text('Avatar', style: AppText.bodySmall),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.s8),
             Wrap(
-              spacing: 10,
-              runSpacing: 10,
+              spacing: AppSpacing.s8,
+              runSpacing: AppSpacing.s8,
               children: UserProfile.availableEmojis.map((e) {
                 final selected = e == _selectedEmoji;
                 return GestureDetector(
                   onTap: () => setState(() => _selectedEmoji = e),
-                  child: Container(
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
                     width: 44, height: 44,
                     decoration: BoxDecoration(
                       color: selected
-                          ? _colors[_selectedColor].withValues(alpha: 0.3)
-                          : Colors.white.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(12),
+                          ? accentColor
+                          : AppColors.paper2,
+                      borderRadius: AppRadius.all(AppRadius.sm),
                       border: Border.all(
-                        color: selected ? _colors[_selectedColor] : Colors.transparent,
+                        color: selected
+                            ? AppColors.accent2
+                            : Colors.transparent,
                         width: 2,
                       ),
                     ),
                     child: Center(
-                      child: Text(e, style: const TextStyle(fontSize: 22)),
+                      child: Text(e,
+                          style: const TextStyle(fontSize: 22)),
                     ),
                   ),
                 );
               }).toList(),
             ),
-            const SizedBox(height: 20),
-            const Align(
+            const SizedBox(height: AppSpacing.s20),
+            // Couleur
+            Align(
               alignment: Alignment.centerLeft,
-              child: Text('Couleur', style: TextStyle(color: Colors.white54, fontSize: 12)),
+              child: Text('Couleur', style: AppText.bodySmall),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.s8),
             Row(
               children: List.generate(_colors.length, (i) {
                 final selected = i == _selectedColor;
@@ -235,9 +248,10 @@ class _ProfileSheetState extends State<ProfileSheet> {
                       margin: const EdgeInsets.symmetric(horizontal: 3),
                       decoration: BoxDecoration(
                         color: _colors[i],
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: AppRadius.all(AppRadius.xs),
                         border: selected
-                            ? Border.all(color: Colors.white, width: 2)
+                            ? Border.all(
+                                color: AppColors.ink, width: 2.5)
                             : null,
                       ),
                     ),
@@ -245,18 +259,17 @@ class _ProfileSheetState extends State<ProfileSheet> {
                 );
               }),
             ),
-            const SizedBox(height: 20),
-            const Align(
+            const SizedBox(height: AppSpacing.s20),
+            // Âge
+            Align(
               alignment: Alignment.centerLeft,
-              child: Text(
-                "Âge de l'enfant (optionnel)",
-                style: TextStyle(color: Colors.white54, fontSize: 12),
-              ),
+              child: Text("Âge de l'enfant (optionnel)",
+                  style: AppText.bodySmall),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppSpacing.s8),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: AppSpacing.s8,
+              runSpacing: AppSpacing.s8,
               children: ProfileAge.values.map((age) {
                 final selected = _selectedAge == age;
                 return GestureDetector(
@@ -265,80 +278,93 @@ class _ProfileSheetState extends State<ProfileSheet> {
                   ),
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.s12,
+                        vertical: AppSpacing.s8),
                     decoration: BoxDecoration(
                       color: selected
-                          ? _colors[_selectedColor].withValues(alpha: 0.3)
-                          : Colors.white.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(12),
+                          ? AppColors.accentSoft
+                          : AppColors.paper2,
+                      borderRadius: AppRadius.all(AppRadius.sm),
                       border: Border.all(
-                        color: selected ? _colors[_selectedColor] : Colors.white12,
+                        color: selected
+                            ? AppColors.accent2
+                            : AppColors.line,
                         width: 1.5,
                       ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Text(age.emoji, style: const TextStyle(fontSize: 16)),
-                        const SizedBox(width: 6),
-                        Text(
-                          age.label,
-                          style: TextStyle(
-                            color: selected ? Colors.white : Colors.white60,
-                            fontSize: 13,
-                            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                          ),
-                        ),
+                        Text(age.emoji,
+                            style: const TextStyle(fontSize: 16)),
+                        const SizedBox(width: AppSpacing.s4),
+                        Text(age.label,
+                            style: AppText.labelLarge.copyWith(
+                              color: selected
+                                  ? AppColors.accentInk
+                                  : AppColors.ink,
+                            )),
                       ],
                     ),
                   ),
                 );
               }).toList(),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.s24),
+            // Bouton principal
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _controller.text.trim().isEmpty
-                    ? null
-                    : () async {
-                        if (_isEdit) {
-                          final updated = UserProfile(
-                            id: widget.existingProfile!.id,
-                            name: _controller.text.trim(),
-                            emoji: _selectedEmoji,
-                            colorIndex: _selectedColor,
-                            createdAt: widget.existingProfile!.createdAt,
-                            age: _selectedAge,
-                          );
-                          await userProfileService.update(updated);
-                          if (context.mounted) {
-                            Navigator.pop(context);
-                            widget.onSaved(updated);
+              child: Container(
+                decoration: _controller.text.trim().isNotEmpty
+                    ? BoxDecoration(
+                        borderRadius: AppRadius.all(AppRadius.xl),
+                        boxShadow: AppShadows.cta,
+                      )
+                    : null,
+                child: ElevatedButton(
+                  onPressed: _controller.text.trim().isEmpty
+                      ? null
+                      : () async {
+                          if (_isEdit) {
+                            final updated = UserProfile(
+                              id: widget.existingProfile!.id,
+                              name: _controller.text.trim(),
+                              emoji: _selectedEmoji,
+                              colorIndex: _selectedColor,
+                              createdAt: widget.existingProfile!.createdAt,
+                              age: _selectedAge,
+                            );
+                            await userProfileService.update(updated);
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              widget.onSaved(updated);
+                            }
+                          } else {
+                            final profile = await userProfileService.create(
+                              name: _controller.text.trim(),
+                              emoji: _selectedEmoji,
+                              colorIndex: _selectedColor,
+                              age: _selectedAge,
+                            );
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                              widget.onSaved(profile);
+                            }
                           }
-                        } else {
-                          final profile = await userProfileService.create(
-                            name: _controller.text.trim(),
-                            emoji: _selectedEmoji,
-                            colorIndex: _selectedColor,
-                            age: _selectedAge,
-                          );
-                          if (context.mounted) {
-                            Navigator.pop(context);
-                            widget.onSaved(profile);
-                          }
-                        }
-                      },
-                child: Text(_isEdit ? 'Enregistrer' : 'Créer le profil'),
+                        },
+                  child: Text(_isEdit ? 'Enregistrer' : 'Créer le profil'),
+                ),
               ),
             ),
             if (_isEdit) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: AppSpacing.s8),
               TextButton(
-                onPressed: () => _confirmDelete(),
-                child: const Text(
+                onPressed: _confirmDelete,
+                child: Text(
                   'Supprimer ce profil',
-                  style: TextStyle(color: Colors.redAccent, fontSize: 13),
+                  style: AppText.bodySmall
+                      .copyWith(color: const Color(0xFFB3261E)),
                 ),
               ),
             ],

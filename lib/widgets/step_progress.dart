@@ -1,5 +1,8 @@
+// Kept for backward compatibility — WizardScaffold renders its own progress bar.
+// This widget is no longer used but kept to avoid import errors during migration.
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_dimens.dart';
 
 class StepProgress extends StatelessWidget {
   final int currentStep;
@@ -13,22 +16,14 @@ class StepProgress extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(totalSteps, (index) {
-        final isActive = index < currentStep;
-        final isCurrent = index == currentStep - 1;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          width: isCurrent ? 24 : 10,
-          height: 10,
-          decoration: BoxDecoration(
-            color: isActive ? AppTheme.primary : Colors.white24,
-            borderRadius: BorderRadius.circular(5),
-          ),
-        );
-      }),
+    return ClipRRect(
+      borderRadius: AppRadius.all(8),
+      child: LinearProgressIndicator(
+        value: currentStep / totalSteps,
+        minHeight: 6,
+        backgroundColor: AppColors.paper2,
+        valueColor: const AlwaysStoppedAnimation(AppColors.accent2),
+      ),
     );
   }
 }
