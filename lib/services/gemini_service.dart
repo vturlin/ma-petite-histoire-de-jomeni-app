@@ -17,6 +17,11 @@ class GeminiService {
         'L\'histoire doit toujours comporter une introduction, une aventure '
         'avec l\'objet magique, et une fin douce et positive. '
         'Vocabulaire adapté à l\'âge indiqué. Pas de violence, pas de peur excessive. '
+        'IMPORTANT : le texte sera lu à voix haute par un moteur de synthèse vocale (TTS). '
+        'Tu dois donc soigner particulièrement la ponctuation pour rendre la lecture naturelle : '
+        'utilise des virgules pour les pauses courtes, des points pour les pauses longues, '
+        'des points d\'exclamation pour l\'enthousiasme, des points de suspension pour le suspense. '
+        'Évite les longues phrases sans ponctuation. Aère les dialogues avec des tirets. '
         'Écris uniquement le récit, sans titre ni introduction de ta part.',
       ),
       generationConfig: GenerationConfig(
@@ -51,7 +56,8 @@ class GeminiService {
         '- Type d\'histoire : $type\n'
         '- Objet magique : $magicObject\n\n'
         'L\'histoire doit durer 3-5 minutes à lire à voix haute (400-600 mots). '
-        'Termine sur un message positif ou une leçon douce.';
+        'Termine sur un message positif ou une leçon douce. '
+        'Rappel : soigne la ponctuation car le texte sera lu par un robot TTS.';
   }
 
   Future<String> generateStory(StoryConfig config) async {

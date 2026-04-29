@@ -16,7 +16,9 @@ import 'screens/screen6_magic_object.dart';
 import 'screens/screen7_story.dart';
 import 'screens/screen_library.dart';
 import 'screens/screen_profiles.dart';
+import 'screens/screen_settings.dart';
 import 'services/api_key_service.dart';
+import 'services/app_settings_service.dart';
 import 'services/story_library_service.dart';
 import 'services/user_profile_service.dart';
 import 'theme/app_theme.dart';
@@ -27,6 +29,7 @@ void main() async {
   await Hive.initFlutter();
   await UserProfileService.init();
   await StoryLibraryService.init();
+  appSettings = await AppSettingsService.load();
   if (!kIsWeb) {
     await [
       Permission.microphone,
@@ -98,6 +101,11 @@ final GoRouter _router = GoRouter(
         config: state.extra as StoryConfig,
         apiKey: apiKeyService.key,
       ),
+    ),
+    // Réglages
+    GoRoute(
+      path: '/settings',
+      builder: (context, state) => const SettingsScreen(),
     ),
     // Bibliothèque
     GoRoute(

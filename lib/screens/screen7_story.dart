@@ -10,13 +10,16 @@ import '../models/story_config.dart';
 import '../services/gemini_service.dart';
 import '../services/gemini_tts_service.dart';
 import '../services/story_library_service.dart';
-import '../theme/app_theme.dart';
+import 'package:flutter_tts/flutter_tts.dart';
+import '../services/app_settings_service.dart';
+import '../services/voice_guide_service.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_dimens.dart';
+import '../theme/app_text_styles.dart';
 
 class StoryScreen extends StatefulWidget {
-  /// Mode génération : config + apiKey
   final StoryConfig? config;
   final String apiKey;
-  /// Mode bibliothèque : histoire déjà sauvegardée
   final SavedStory? savedStory;
 
   const StoryScreen({
@@ -34,6 +37,7 @@ class StoryScreen extends StatefulWidget {
 
 class _StoryScreenState extends State<StoryScreen> {
   final AudioPlayer _player = AudioPlayer();
+  final FlutterTts _nativeTts = FlutterTts();
 
   // ─── Texte ────────────────────────────────────────────────────────────────
   String _fullStory = '';
@@ -67,8 +71,9 @@ class _StoryScreenState extends State<StoryScreen> {
   @override
   void initState() {
     super.initState();
+    _player.setVolume(appSettings.audioVolume);
     _player.onPlayerComplete.listen((_) => _onChunkComplete());
-
+    _nativeTts.setCompletionHandler(() => _onChunkComplete());
     if (widget.isLibraryMode) {
       _loadFromLibrary();
     } else {
@@ -76,28 +81,21 @@ class _StoryScreenState extends State<StoryScreen> {
     }
   }
 
-  // ─── Chargement depuis la bibliothèque ────────────────────────────────────
-
   void _loadFromLibrary() {
     final saved = widget.savedStory!;
     _fullStory = saved.text;
     _storyId = saved.id;
     _isSaved = true;
     _chunks = _splitIntoChunks(_fullStory);
-
-    // Charge l'audio depuis le cache Hive
     for (int i = 0; i < saved.audioChunkCount; i++) {
       final wav = storyLibrary.getAudioChunk(saved.id, i);
       if (wav != null) _audioCache[i] = wav;
     }
-
     setState(() {
       _isLoading = false;
       _displayedStory = _fullStory;
     });
   }
-
-  // ─── Génération de l'histoire ─────────────────────────────────────────────
 
   Future<void> _generateStory() async {
     setState(() {
@@ -140,7 +138,7 @@ class _StoryScreenState extends State<StoryScreen> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _error = 'Erreur Gemini : $e';
+        _error = 'Impossible de créer l\'histoire.\n\nVérifie ta connexion et réessaie.\n\n($e)';
       });
     }
   }
@@ -172,8 +170,6 @@ class _StoryScreenState extends State<StoryScreen> {
     return chunks.isEmpty ? [text] : chunks;
   }
 
-  // ─── Typewriter ───────────────────────────────────────────────────────────
-
   void _startTypewriter() {
     _typingTimer?.cancel();
     _typingIndex = 0;
@@ -193,23 +189,33 @@ class _StoryScreenState extends State<StoryScreen> {
     });
   }
 
-  // ─── Lecture TTS ──────────────────────────────────────────────────────────
+  // Lecture depuis bibliothèque = audio Gemini sauvegardé (audioplayers)
+  // Lecture en direct        = TTS natif (instantané, sans API)
+  bool get _useGeminiAudio => widget.isLibraryMode;
 
   Future<void> _handlePlayButton() async {
-    if (_isPlaying) {
-      await _player.pause();
-      setState(() { _isPlaying = false; _isPaused = true; });
-    } else if (_isPaused) {
-      await _player.resume();
-      setState(() { _isPlaying = true; _isPaused = false; });
+    if (_useGeminiAudio) {
+      // Bibliothèque : pause/reprise possible sur l'audio Gemini
+      if (_isPlaying) {
+        await _player.pause();
+        setState(() { _isPlaying = false; _isPaused = true; });
+      } else if (_isPaused) {
+        await _player.resume();
+        setState(() { _isPlaying = true; _isPaused = false; });
+      } else {
+        _currentChunk = 0;
+        await _playChunk(0);
+      }
     } else {
-      _startPlayback();
+      // Lecture en direct : TTS natif (stop = seule option de pause sur Android)
+      if (_isPlaying) {
+        await _nativeTts.stop();
+        setState(() { _isPlaying = false; _isPaused = false; });
+      } else {
+        _currentChunk = 0;
+        await _playChunk(0);
+      }
     }
-  }
-
-  Future<void> _startPlayback() async {
-    _currentChunk = 0;
-    await _playChunk(0);
   }
 
   Future<void> _playChunk(int index) async {
@@ -218,25 +224,47 @@ class _StoryScreenState extends State<StoryScreen> {
       return;
     }
 
+    // ── TTS natif (lecture en direct) ───────────────────────────────────────
+    if (!_useGeminiAudio) {
+      setState(() {
+        _isPlaying = true;
+        _isPaused = false;
+        _audioStatus = 'Partie ${index + 1}/${_chunks.length}';
+        _ttsError = null;
+      });
+      try {
+        await voiceGuide.stop();
+        final name   = appSettings.voiceName;
+        final locale = appSettings.voiceLocale;
+        await _nativeTts.setLanguage(locale ?? 'fr-FR');
+        if (name != null && locale != null) {
+          await _nativeTts.setVoice({'name': name, 'locale': locale});
+        }
+        await _nativeTts.setSpeechRate(appSettings.speechRate);
+        await _nativeTts.setVolume(appSettings.speechVolume);
+        await _nativeTts.setPitch(appSettings.speechPitch);
+        await _nativeTts.speak(_chunks[index]);
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _isPlaying = false;
+          _ttsError = '🎙️ Erreur voix native : $e';
+          _audioStatus = '';
+        });
+      }
+      return;
+    }
+
+    // ── Audio Gemini sauvegardé (bibliothèque) ──────────────────────────────
     setState(() {
       _isLoadingAudio = true;
       _ttsError = null;
-      _audioStatus = 'Génération ${index + 1}/${_chunks.length}...';
+      _audioStatus = 'Chargement ${index + 1}/${_chunks.length}...';
     });
 
     try {
-      Uint8List audio;
-      if (_audioCache.containsKey(index)) {
-        audio = _audioCache[index]!;
-      } else {
-        final tts = GeminiTtsService(widget.apiKey);
-        audio = await tts.generateAudio(_chunks[index]);
-        _audioCache[index] = audio;
-        // Sauvegarde automatique du chunk audio si l'histoire est déjà sauvegardée
-        if (_isSaved && _storyId != null) {
-          await storyLibrary.saveAudioChunk(_storyId!, index, audio);
-        }
-      }
+      final audio = _audioCache[index];
+      if (audio == null) throw Exception('Audio introuvable pour ce chunk.');
 
       if (!mounted) return;
       setState(() {
@@ -246,24 +274,14 @@ class _StoryScreenState extends State<StoryScreen> {
         _audioStatus = 'Partie ${index + 1}/${_chunks.length}';
       });
 
+      await _player.setVolume(appSettings.audioVolume);
       await _player.play(BytesSource(audio));
-      // Pas de pré-génération parallèle : la durée naturelle de lecture
-      // (~30-45s par chunk) espace suffisamment les appels API.
     } catch (e) {
       if (!mounted) return;
-      final msg = e.toString();
-      String friendlyError;
-      if (msg.contains('429') || msg.contains('RESOURCE_EXHAUSTED')) {
-        friendlyError = '⏳ Quota audio momentanément dépassé. Réessaie dans 1 minute.';
-      } else if (msg.contains('timeout')) {
-        friendlyError = '⏱️ Délai dépassé. Vérifie ta connexion et réessaie.';
-      } else {
-        friendlyError = '🎙️ Génération audio impossible. Réessaie.';
-      }
       setState(() {
         _isLoadingAudio = false;
         _isPlaying = false;
-        _ttsError = friendlyError;
+        _ttsError = '🎙️ Lecture impossible. $e';
         _audioStatus = '';
       });
     }
@@ -275,8 +293,6 @@ class _StoryScreenState extends State<StoryScreen> {
     _playChunk(_currentChunk);
   }
 
-  // ─── Sauvegarde ───────────────────────────────────────────────────────────
-
   Future<void> _saveStory() async {
     if (_isSaved || _isSaving || _fullStory.isEmpty) return;
 
@@ -285,15 +301,12 @@ class _StoryScreenState extends State<StoryScreen> {
       _saveStatus = 'Génération audio en cours...';
     });
 
-    // Génère les chunks audio manquants séquentiellement
-    // (délai entre requêtes pour respecter la limite gratuite de l'API)
     final tts = GeminiTtsService(widget.apiKey);
     for (int i = 0; i < _chunks.length; i++) {
       if (!_audioCache.containsKey(i)) {
         setState(() => _saveStatus = 'Audio ${i + 1}/${_chunks.length}...');
         try {
           if (i > 0) {
-            // Pause de 22s entre requêtes (limite free tier ≈ 3 req/min)
             for (int s = 22; s > 0; s--) {
               if (!mounted) return;
               setState(() => _saveStatus = 'Audio ${i + 1}/${_chunks.length} (attente ${s}s...)');
@@ -319,7 +332,6 @@ class _StoryScreenState extends State<StoryScreen> {
       }
     }
 
-    // Sauvegarde en base
     final config = widget.config!;
     final story = SavedStory(
       id: _storyId!,
@@ -351,10 +363,10 @@ class _StoryScreenState extends State<StoryScreen> {
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: const Text('✅ Histoire sauvegardée avec l\'audio !'),
-        backgroundColor: AppTheme.primary,
+        content: const Text('✅ Histoire sauvegardée !'),
+        backgroundColor: AppColors.accent2,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(borderRadius: AppRadius.all(AppRadius.md)),
       ),
     );
   }
@@ -363,33 +375,35 @@ class _StoryScreenState extends State<StoryScreen> {
   void dispose() {
     _typingTimer?.cancel();
     _player.dispose();
+    _nativeTts.stop();
     super.dispose();
   }
-
-  // ─── UI ───────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.paper,
       body: SafeArea(
         child: Column(
           children: [
-            _buildHeader(),
-            if (_showPrompt && _promptUsed.isNotEmpty) _buildPromptRecap(),
+            _buildTopBar(),
             if (_isSaving)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: LinearProgressIndicator(
-                  backgroundColor: Colors.white12,
-                  color: AppTheme.accent,
-                  borderRadius: BorderRadius.circular(4),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s20, vertical: AppSpacing.s4),
+                child: ClipRRect(
+                  borderRadius: AppRadius.all(4),
+                  child: LinearProgressIndicator(
+                    minHeight: 4,
+                    backgroundColor: AppColors.paper2,
+                    valueColor: const AlwaysStoppedAnimation(AppColors.accent2),
+                  ),
                 ),
               ),
             if (_saveStatus.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(_saveStatus,
-                    style: const TextStyle(color: Colors.white54, fontSize: 11)),
+                padding: const EdgeInsets.only(bottom: AppSpacing.s4),
+                child: Text(_saveStatus, style: AppText.bodySmall),
               ),
             Expanded(
               child: _error != null
@@ -401,10 +415,12 @@ class _StoryScreenState extends State<StoryScreen> {
             if (!_isLoading && _fullStory.isNotEmpty) _buildPlayer(),
             if (_ttsError != null)
               Padding(
-                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.s20, 0, AppSpacing.s20, AppSpacing.s8),
                 child: Text(_ttsError!,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.redAccent, fontSize: 11)),
+                    style: AppText.bodySmall
+                        .copyWith(color: const Color(0xFFB3261E))),
               ),
           ],
         ),
@@ -412,75 +428,48 @@ class _StoryScreenState extends State<StoryScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildTopBar() {
+    final title = widget.isLibraryMode
+        ? (widget.savedStory!.title.isEmpty ? 'Mon histoire' : widget.savedStory!.title)
+        : (widget.config!.storyTitle.isEmpty ? 'Mon histoire' : widget.config!.storyTitle);
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      padding: const EdgeInsets.fromLTRB(
+          AppSpacing.s20, AppSpacing.s16, AppSpacing.s20, AppSpacing.s8),
       child: Row(
         children: [
-          IconButton(
-            onPressed: () async {
+          _RoundBtn(
+            icon: Icons.arrow_back,
+            onTap: () async {
               await _player.stop();
               if (mounted) context.pop();
             },
-            icon: const Icon(Icons.arrow_back_ios, color: Colors.white70, size: 20),
           ),
           Expanded(
             child: Text(
-              widget.isLibraryMode
-                  ? (widget.savedStory!.title.isEmpty ? 'Mon histoire' : widget.savedStory!.title)
-                  : (widget.config!.storyTitle.isEmpty ? 'Mon histoire' : widget.config!.storyTitle),
+              title,
               textAlign: TextAlign.center,
-              style: const TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold),
+              style: AppText.titleMedium,
               overflow: TextOverflow.ellipsis,
             ),
           ),
-          // Bouton prompt (mode génération uniquement)
           if (!widget.isLibraryMode)
-            IconButton(
-              onPressed: () => setState(() => _showPrompt = !_showPrompt),
-              icon: Icon(Icons.code, color: _showPrompt ? AppTheme.accent : Colors.white38, size: 20),
-            ),
-          // Bouton sauvegarder (mode génération uniquement)
+            _RoundBtn(
+              icon: _showPrompt ? Icons.code_off : Icons.code,
+              onTap: () => setState(() => _showPrompt = !_showPrompt),
+              active: _showPrompt,
+            )
+          else
+            const SizedBox(width: AppSize.iconBtnTopbar),
+          const SizedBox(width: AppSpacing.s8),
           if (!widget.isLibraryMode)
-            IconButton(
-              onPressed: (_isSaved || _isSaving || _isLoading) ? null : _saveStory,
-              tooltip: _isSaved ? 'Déjà sauvegardée' : 'Sauvegarder',
-              icon: Icon(
-                _isSaved ? Icons.bookmark : Icons.bookmark_border,
-                color: _isSaved ? AppTheme.accent : Colors.white54,
-                size: 24,
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPromptRecap() {
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppTheme.primary.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppTheme.primary.withValues(alpha: 0.35)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.psychology_alt, color: AppTheme.accent, size: 15),
-              const SizedBox(width: 6),
-              const Text('Prompt Gemini', style: TextStyle(color: AppTheme.accent, fontSize: 11, fontWeight: FontWeight.bold)),
-              const Spacer(),
-              Text('${_chunks.length} partie${_chunks.length > 1 ? 's' : ''} audio',
-                  style: const TextStyle(color: Colors.white30, fontSize: 10)),
-            ],
-          ),
-          const Divider(color: Colors.white10, height: 12),
-          Text(_promptUsed,
-              style: const TextStyle(color: Colors.white60, fontSize: 11, height: 1.6, fontFamily: 'monospace')),
+            _RoundBtn(
+              icon: _isSaved ? Icons.bookmark : Icons.bookmark_border,
+              onTap: (_isSaved || _isSaving || _isLoading) ? null : _saveStory,
+              active: _isSaved,
+            )
+          else
+            const SizedBox(width: AppSize.iconBtnTopbar),
         ],
       ),
     );
@@ -491,62 +480,129 @@ class _StoryScreenState extends State<StoryScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox(
-            width: 72, height: 72,
-            child: CircularProgressIndicator(color: AppTheme.accent, strokeWidth: 3),
+          Container(
+            width: 110, height: 110,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [AppColors.accentSoft, AppColors.accent1],
+              ),
+              boxShadow: AppShadows.cta,
+            ),
+            child: const Center(
+              child: Text('📖', style: TextStyle(fontSize: 52)),
+            ),
           ),
-          const SizedBox(height: 24),
-          const Text('✨ Gemini écrit ton histoire...', style: TextStyle(color: Colors.white70, fontSize: 18)),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppSpacing.s24),
+          Text('Gemini écrit ton histoire…', style: AppText.headlineMedium),
+          const SizedBox(height: AppSpacing.s8),
           Text(
-            '${widget.config?.theme?.emoji ?? ''} ${widget.config?.theme?.label ?? ''} · 🪄 ${widget.config?.magicObject ?? ''}',
-            style: const TextStyle(color: Colors.white38, fontSize: 13),
+            '${widget.config?.theme?.emoji ?? ''} ${widget.config?.theme?.label ?? ''}',
+            style: AppText.bodyMedium,
           ),
+          const SizedBox(height: AppSpacing.s32),
+          const CircularProgressIndicator(color: AppColors.accent2, strokeWidth: 3),
         ],
       ),
     );
   }
 
   Widget _buildStory() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(color: AppTheme.cardBg, borderRadius: BorderRadius.circular(20)),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            MarkdownBody(
-              data: _displayedStory,
-              styleSheet: MarkdownStyleSheet(
-                p: const TextStyle(color: Colors.white, fontSize: 16, height: 1.85),
-                strong: const TextStyle(color: AppTheme.accent, fontSize: 16, fontWeight: FontWeight.bold),
-                em: const TextStyle(color: Colors.white70, fontSize: 16, fontStyle: FontStyle.italic),
+    return Column(
+      children: [
+        if (_showPrompt && _promptUsed.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.fromLTRB(
+                AppSpacing.s20, 0, AppSpacing.s20, AppSpacing.s8),
+            padding: const EdgeInsets.all(AppSpacing.s12),
+            decoration: BoxDecoration(
+              color: AppColors.accentSoft,
+              borderRadius: AppRadius.all(AppRadius.md),
+              border: Border.all(color: AppColors.accent2, width: 1),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(children: [
+                  const Icon(Icons.psychology_alt,
+                      color: AppColors.accent2, size: 14),
+                  const SizedBox(width: AppSpacing.s4),
+                  Text('Prompt Gemini',
+                      style: AppText.bodySmall
+                          .copyWith(color: AppColors.accentInk,
+                              fontWeight: FontWeight.w700)),
+                ]),
+                const SizedBox(height: AppSpacing.s4),
+                Text(_promptUsed,
+                    style: AppText.bodySmall
+                        .copyWith(fontFamily: 'monospace')),
+              ],
+            ),
+          ),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.s20, 0, AppSpacing.s20, AppSpacing.s8),
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.s20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: AppRadius.all(AppRadius.xl),
+                boxShadow: AppShadows.soft,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  MarkdownBody(
+                    data: _displayedStory,
+                    styleSheet: MarkdownStyleSheet(
+                      p: AppText.bodyLarge.copyWith(height: 1.85),
+                      strong: AppText.bodyLarge.copyWith(
+                          color: AppColors.accentInk,
+                          fontWeight: FontWeight.w700),
+                      em: AppText.bodyLarge.copyWith(
+                          color: AppColors.inkSoft,
+                          fontStyle: FontStyle.italic),
+                    ),
+                  ),
+                  if (_isTyping)
+                    Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.s4),
+                      child: Text('▊',
+                          style: AppText.bodyLarge
+                              .copyWith(color: AppColors.accent2)),
+                    ),
+                ],
               ),
             ),
-            if (_isTyping)
-              const Padding(
-                padding: EdgeInsets.only(top: 4),
-                child: Text('▊', style: TextStyle(color: AppTheme.accent, fontSize: 16)),
-              ),
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 
   Widget _buildError() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(AppSpacing.s24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Text('😕', style: TextStyle(fontSize: 56)),
-            const SizedBox(height: 16),
-            Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white70, fontSize: 13)),
-            const SizedBox(height: 24),
-            ElevatedButton(onPressed: _generateStory, child: const Text('Réessayer')),
+            const SizedBox(height: AppSpacing.s16),
+            Text(_error!,
+                textAlign: TextAlign.center, style: AppText.bodyMedium),
+            const SizedBox(height: AppSpacing.s24),
+            Container(
+              decoration: BoxDecoration(
+                  borderRadius: AppRadius.all(AppRadius.xl),
+                  boxShadow: AppShadows.cta),
+              child: ElevatedButton(
+                  onPressed: _generateStory,
+                  child: const Text('Réessayer')),
+            ),
           ],
         ),
       ),
@@ -555,26 +611,60 @@ class _StoryScreenState extends State<StoryScreen> {
 
   Widget _buildPlayer() {
     final bool inactive = _isTyping;
-    final IconData playIcon = _isPlaying ? Icons.pause : Icons.play_arrow;
+    final IconData playIcon =
+        _isPlaying ? Icons.pause : Icons.play_arrow;
     final Color btnColor = inactive
-        ? Colors.white12
-        : _isPlaying ? AppTheme.secondary : _isPaused ? AppTheme.primary : AppTheme.accent;
+        ? AppColors.line
+        : _isPlaying
+            ? AppColors.sky
+            : _isPaused
+                ? AppColors.accent1
+                : AppColors.accent2;
 
-    return Column(
-      children: [
-        if (_audioStatus.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 4),
-            child: Text(_audioStatus,
-                style: TextStyle(color: _isPlaying ? AppTheme.accent : Colors.white38, fontSize: 11)),
+    return Container(
+      margin: const EdgeInsets.all(AppSpacing.s16),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.s20, vertical: AppSpacing.s16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: AppRadius.all(AppRadius.xl),
+        boxShadow: AppShadows.soft,
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.s8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _useGeminiAudio ? AppColors.accentSoft : AppColors.mint,
+                  borderRadius: AppRadius.all(AppRadius.xs),
+                ),
+                child: Text(
+                  _useGeminiAudio ? '🤖 Audio Gemini' : '📱 Voix native',
+                  style: AppText.bodySmall
+                      .copyWith(color: AppColors.accentInk),
+                ),
+              ),
+            ],
           ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          child: Row(
+          const SizedBox(height: AppSpacing.s4),
+          if (_audioStatus.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(bottom: AppSpacing.s8),
+              child: Text(_audioStatus,
+                  style: AppText.bodySmall.copyWith(
+                      color: _isPlaying
+                          ? AppColors.accent2
+                          : AppColors.inkMute)),
+            ),
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _playerButton(
-                icon: Icons.home,
+              _playerBtn(
+                icon: Icons.home_outlined,
                 label: 'Accueil',
                 onTap: () async {
                   await _player.stop();
@@ -585,29 +675,34 @@ class _StoryScreenState extends State<StoryScreen> {
                 onTap: inactive ? null : _handlePlayButton,
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  width: 64, height: 64,
+                  width: AppSize.iconBtnPlay,
+                  height: AppSize.iconBtnPlay,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: btnColor,
-                    boxShadow: inactive ? [] : [
-                      BoxShadow(color: btnColor.withValues(alpha: 0.45), blurRadius: 14, spreadRadius: 2),
-                    ],
+                    boxShadow: inactive ? [] : AppShadows.cta,
                   ),
                   child: _isLoadingAudio
                       ? const Padding(
-                          padding: EdgeInsets.all(16),
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
+                          padding: EdgeInsets.all(20),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white),
                         )
                       : Icon(
                           inactive ? Icons.hourglass_top : playIcon,
-                          color: inactive ? Colors.white30 : AppTheme.background,
-                          size: 30,
+                          color: inactive
+                              ? AppColors.inkMute
+                              : Colors.white,
+                          size: 32,
                         ),
                 ),
               ),
-              _playerButton(
-                icon: widget.isLibraryMode ? Icons.list : Icons.casino,
-                label: widget.isLibraryMode ? 'Bibliothèque' : 'Recréer',
+              _playerBtn(
+                icon: widget.isLibraryMode
+                    ? Icons.list_outlined
+                    : Icons.casino_outlined,
+                label: widget.isLibraryMode ? 'Biblio.' : 'Recréer',
                 onTap: widget.isLibraryMode
                     ? () async {
                         await _player.stop();
@@ -622,21 +717,66 @@ class _StoryScreenState extends State<StoryScreen> {
               ),
             ],
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
-  Widget _playerButton({required IconData icon, required String label, VoidCallback? onTap}) {
-    return ElevatedButton.icon(
-      onPressed: onTap,
-      icon: Icon(icon, size: 15),
-      label: Text(label),
-      style: ElevatedButton.styleFrom(
-        backgroundColor: AppTheme.cardBg,
-        foregroundColor: onTap == null ? Colors.white30 : Colors.white,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        textStyle: const TextStyle(fontSize: 12),
+  Widget _playerBtn({
+    required IconData icon,
+    required String label,
+    VoidCallback? onTap,
+  }) {
+    final enabled = onTap != null;
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        children: [
+          Container(
+            width: 44, height: 44,
+            decoration: BoxDecoration(
+              color: enabled ? AppColors.accentSoft : AppColors.paper2,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon,
+                color: enabled ? AppColors.accent2 : AppColors.inkMute,
+                size: 22),
+          ),
+          const SizedBox(height: AppSpacing.s4),
+          Text(label,
+              style: AppText.bodySmall.copyWith(
+                  color: enabled ? AppColors.ink : AppColors.inkMute)),
+        ],
+      ),
+    );
+  }
+}
+
+class _RoundBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool active;
+
+  const _RoundBtn({required this.icon, this.onTap, this.active = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: AppSize.iconBtnTopbar,
+        height: AppSize.iconBtnTopbar,
+        decoration: BoxDecoration(
+          color: active ? AppColors.accentSoft : Colors.white,
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: active ? AppColors.accent2 : AppColors.line,
+            width: 1.5,
+          ),
+          boxShadow: AppShadows.soft,
+        ),
+        child: Icon(icon,
+            color: active ? AppColors.accent2 : AppColors.ink, size: 18),
       ),
     );
   }

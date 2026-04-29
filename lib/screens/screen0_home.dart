@@ -72,11 +72,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const ProfileButton(),
-                      _RoundIconBtn(
-                        icon: Icons.library_books_outlined,
-                        onTap: _savedCount == 0
-                            ? null
-                            : () => context.push('/library'),
+                      Row(
+                        children: [
+                          _RoundIconBtn(
+                            icon: Icons.settings_outlined,
+                            onTap: () => context.push('/settings'),
+                          ),
+                          const SizedBox(width: 8),
+                          _RoundIconBtn(
+                            icon: Icons.library_books_outlined,
+                            onTap: _savedCount == 0
+                                ? null
+                                : () => context.push('/library'),
+                          ),
+                        ],
                       ),
                     ],
                   ).animate().fadeIn(duration: 400.ms),
