@@ -4,6 +4,7 @@ import '../services/voice_guide_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
+import 'star_background.dart';
 
 class WizardScaffold extends StatefulWidget {
   final int step;
@@ -78,7 +79,7 @@ class _WizardScaffoldState extends State<WizardScaffold> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.paper,
-      body: SafeArea(
+      body: StarBackground(child: SafeArea(
         child: Column(
           children: [
             // ── Top bar ────────────────────────────────────────────────────
@@ -201,7 +202,7 @@ class _WizardScaffoldState extends State<WizardScaffold> {
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 }
@@ -220,32 +221,21 @@ class _SpeakButton extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.s12, vertical: AppSpacing.s8),
+        width: 52,
+        height: 52,
         decoration: BoxDecoration(
+          shape: BoxShape.circle,
           color: isSpeaking ? AppColors.accentSoft : Colors.white,
-          borderRadius: AppRadius.all(AppRadius.pill),
           border: Border.all(
             color: isSpeaking ? AppColors.accent2 : AppColors.line,
-            width: 1.5,
+            width: 2,
           ),
+          boxShadow: isSpeaking ? AppShadows.cta : AppShadows.soft,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              isSpeaking ? Icons.volume_up : Icons.volume_up_outlined,
-              size: 16,
-              color: isSpeaking ? AppColors.accent2 : AppColors.inkSoft,
-            ),
-            const SizedBox(width: AppSpacing.s4),
-            Text(
-              isSpeaking ? 'En cours…' : 'Réécouter',
-              style: AppText.bodySmall.copyWith(
-                color: isSpeaking ? AppColors.accent2 : AppColors.inkSoft,
-              ),
-            ),
-          ],
+        child: Icon(
+          isSpeaking ? Icons.volume_up : Icons.play_arrow_rounded,
+          size: 28,
+          color: isSpeaking ? AppColors.accent2 : AppColors.inkSoft,
         ),
       ),
     );
