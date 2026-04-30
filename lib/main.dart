@@ -17,7 +17,7 @@ import 'screens/screen7_story.dart';
 import 'screens/screen_library.dart';
 import 'screens/screen_profiles.dart';
 import 'screens/screen_settings.dart';
-import 'services/api_key_service.dart';
+import 'services/api_key_service.dart' show geminiApiKey;
 import 'services/app_settings_service.dart';
 import 'services/story_library_service.dart';
 import 'services/user_profile_service.dart';
@@ -99,7 +99,7 @@ final GoRouter _router = GoRouter(
       path: '/generating',
       builder: (context, state) => StoryScreen(
         config: state.extra as StoryConfig,
-        apiKey: apiKeyService.key,
+        apiKey: geminiApiKey,
       ),
     ),
     // Réglages
@@ -116,7 +116,7 @@ final GoRouter _router = GoRouter(
       path: '/play',
       builder: (context, state) => StoryScreen(
         savedStory: state.extra as SavedStory,
-        apiKey: apiKeyService.key,
+        apiKey: geminiApiKey,
       ),
     ),
   ],

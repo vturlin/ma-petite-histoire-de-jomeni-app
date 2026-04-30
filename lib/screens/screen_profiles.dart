@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../models/user_profile.dart';
-import '../services/api_key_service.dart';
 import '../services/user_profile_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
@@ -35,9 +34,6 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
   void initState() {
     super.initState();
     _load();
-    if (!apiKeyService.isSelected) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _selectApiKey());
-    }
   }
 
   void _load() => setState(() => _profiles = userProfileService.getAll());
@@ -121,43 +117,6 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Future<void> _selectApiKey() async {
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppColors.forestBg2,
-        shape:
-            RoundedRectangleBorder(borderRadius: AppRadius.all(AppRadius.xl)),
-        title: Text('🔑 Clé API à utiliser', style: AppText.titleLarge),
-        content: Text(
-          'Choisis la clé Gemini pour cette session.',
-          style: AppText.bodyMedium,
-        ),
-        actions: [
-          _ApiKeyOption(
-            label: '🧪 Gemini API Key',
-            description: '…77kQ',
-            color: AppColors.forestGold,
-            onTap: () {
-              apiKeyService.selectProduction();
-              Navigator.pop(context);
-            },
-          ),
-          _ApiKeyOption(
-            label: '🧪 Jomeni app test',
-            description: '…8OD4',
-            color: AppColors.sky,
-            onTap: () {
-              apiKeyService.selectTest();
-              Navigator.pop(context);
-            },
-          ),
-        ],
       ),
     );
   }
@@ -391,47 +350,3 @@ class _AddProfileCard extends StatelessWidget {
   }
 }
 
-// ── Option clé API ────────────────────────────────────────────────────────────
-
-class _ApiKeyOption extends StatelessWidget {
-  final String label;
-  final String description;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _ApiKeyOption({
-    required this.label,
-    required this.description,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.s4, vertical: AppSpacing.s4),
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.s16, vertical: AppSpacing.s12),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: AppRadius.all(AppRadius.md),
-            border: Border.all(color: color.withValues(alpha: 0.5), width: 1.5),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(label, style: AppText.labelLarge),
-              const SizedBox(height: 2),
-              Text(description, style: AppText.bodySmall),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
