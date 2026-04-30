@@ -6,7 +6,7 @@ import '../services/user_profile_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
-import '../widgets/wizard_scaffold.dart';
+import '../widgets/forest_step_frame.dart';
 
 class WelcomeScreen extends StatefulWidget {
   final StoryConfig config;
@@ -67,12 +67,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WizardScaffold(
+    return ForestStepFrame(
       step: 1,
-      pastilleColor: AppColors.accentSoft,
-      pastilleIcon: Icons.menu_book_outlined,
-      title: 'Créons ton histoire !',
-      subtitle: 'Donne un titre à ton aventure',
+      microLabel: 'titre de l\'histoire',
       voiceInstruction: 'Quel est le titre de ton histoire ?',
       canContinue: _controller.text.trim().isNotEmpty,
       onContinue: () {
@@ -81,45 +78,39 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       },
       content: Column(
         children: [
-          // Input titre
           TextField(
             controller: _controller,
             onChanged: (_) => setState(() {}),
             style: AppText.bodyLarge,
             textAlign: TextAlign.center,
-            decoration: InputDecoration(
+            decoration: const InputDecoration(
               hintText: 'ex : L\'aventure de Léo le brave',
-              prefixIcon: Container(
-                margin: const EdgeInsets.all(AppSpacing.s8),
-                decoration: BoxDecoration(
-                  color: AppColors.accentSoft,
-                  borderRadius: AppRadius.all(AppRadius.xs),
-                ),
-                child: const Icon(Icons.auto_stories,
-                    color: AppColors.accent2, size: 20),
-              ),
             ),
           ),
           const SizedBox(height: AppSpacing.s40),
-          // Gros bouton micro centré
           Center(
             child: GestureDetector(
               onTap: _speechAvailable ? _toggleListening : null,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                width: 110,
-                height: 110,
+                width: 100,
+                height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _isListening
-                      ? AppColors.accent2
-                      : AppColors.accentSoft,
-                  boxShadow: _isListening ? AppShadows.cta : AppShadows.soft,
+                  color: AppColors.forestGold,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.forestGold.withValues(
+                          alpha: _isListening ? 0.7 : 0.35),
+                      blurRadius: _isListening ? 28 : 14,
+                      spreadRadius: _isListening ? 6 : 0,
+                    ),
+                  ],
                 ),
                 child: Icon(
                   _isListening ? Icons.mic : Icons.mic_none,
-                  size: 52,
-                  color: _isListening ? Colors.white : AppColors.accent2,
+                  size: 46,
+                  color: AppColors.forestInk,
                 ),
               ),
             ),
@@ -130,11 +121,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               _isListening
                   ? 'J\'écoute…'
                   : _speechAvailable
-                      ? 'Appuie pour dicter le titre'
-                      : 'Micro non disponible',
-              style: AppText.bodyMedium.copyWith(
-                color: _isListening ? AppColors.accent2 : AppColors.inkMute,
-              ),
+                      ? '· appuie pour dicter ·'
+                      : '· micro non disponible ·',
+              style: AppText.microLabel,
             ),
           ),
         ],

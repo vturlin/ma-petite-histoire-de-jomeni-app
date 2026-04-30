@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,6 +17,7 @@ import '../services/voice_guide_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
+import '../widgets/forest_background.dart';
 
 class StoryScreen extends StatefulWidget {
   final StoryConfig? config;
@@ -138,7 +140,8 @@ class _StoryScreenState extends State<StoryScreen> {
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _error = 'Impossible de créer l\'histoire.\n\nVérifie ta connexion et réessaie.\n\n($e)';
+        _error =
+            'Impossible de créer l\'histoire.\n\nVérifie ta connexion et réessaie.\n\n($e)';
       });
     }
   }
@@ -176,7 +179,10 @@ class _StoryScreenState extends State<StoryScreen> {
     setState(() => _isTyping = true);
 
     _typingTimer = Timer.periodic(const Duration(milliseconds: 25), (timer) {
-      if (!mounted) { timer.cancel(); return; }
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
       final next = (_typingIndex + 25).clamp(0, _fullStory.length);
       setState(() {
         _typingIndex = next;
@@ -189,28 +195,33 @@ class _StoryScreenState extends State<StoryScreen> {
     });
   }
 
-  // Lecture depuis bibliothèque = audio Gemini sauvegardé (audioplayers)
-  // Lecture en direct        = TTS natif (instantané, sans API)
   bool get _useGeminiAudio => widget.isLibraryMode;
 
   Future<void> _handlePlayButton() async {
     if (_useGeminiAudio) {
-      // Bibliothèque : pause/reprise possible sur l'audio Gemini
       if (_isPlaying) {
         await _player.pause();
-        setState(() { _isPlaying = false; _isPaused = true; });
+        setState(() {
+          _isPlaying = false;
+          _isPaused = true;
+        });
       } else if (_isPaused) {
         await _player.resume();
-        setState(() { _isPlaying = true; _isPaused = false; });
+        setState(() {
+          _isPlaying = true;
+          _isPaused = false;
+        });
       } else {
         _currentChunk = 0;
         await _playChunk(0);
       }
     } else {
-      // Lecture en direct : TTS natif (stop = seule option de pause sur Android)
       if (_isPlaying) {
         await _nativeTts.stop();
-        setState(() { _isPlaying = false; _isPaused = false; });
+        setState(() {
+          _isPlaying = false;
+          _isPaused = false;
+        });
       } else {
         _currentChunk = 0;
         await _playChunk(0);
@@ -220,11 +231,14 @@ class _StoryScreenState extends State<StoryScreen> {
 
   Future<void> _playChunk(int index) async {
     if (index >= _chunks.length) {
-      setState(() { _isPlaying = false; _isPaused = false; _audioStatus = ''; });
+      setState(() {
+        _isPlaying = false;
+        _isPaused = false;
+        _audioStatus = '';
+      });
       return;
     }
 
-    // ── TTS natif (lecture en direct) ───────────────────────────────────────
     if (!_useGeminiAudio) {
       setState(() {
         _isPlaying = true;
@@ -234,7 +248,7 @@ class _StoryScreenState extends State<StoryScreen> {
       });
       try {
         await voiceGuide.stop();
-        final name   = appSettings.voiceName;
+        final name = appSettings.voiceName;
         final locale = appSettings.voiceLocale;
         await _nativeTts.setLanguage(locale ?? 'fr-FR');
         if (name != null && locale != null) {
@@ -255,7 +269,6 @@ class _StoryScreenState extends State<StoryScreen> {
       return;
     }
 
-    // ── Audio Gemini sauvegardé (bibliothèque) ──────────────────────────────
     setState(() {
       _isLoadingAudio = true;
       _ttsError = null;
@@ -309,7 +322,8 @@ class _StoryScreenState extends State<StoryScreen> {
           if (i > 0) {
             for (int s = 22; s > 0; s--) {
               if (!mounted) return;
-              setState(() => _saveStatus = 'Audio ${i + 1}/${_chunks.length} (attente ${s}s...)');
+              setState(() => _saveStatus =
+                  'Audio ${i + 1}/${_chunks.length} (attente ${s}s...)');
               await Future.delayed(const Duration(seconds: 1));
             }
           }
@@ -322,9 +336,10 @@ class _StoryScreenState extends State<StoryScreen> {
           final msg = e.toString();
           setState(() {
             _isSaving = false;
-            _ttsError = msg.contains('429') || msg.contains('RESOURCE_EXHAUSTED')
-                ? '⏳ Quota audio dépassé. Réessaie dans 1 minute.'
-                : '🎙️ Génération audio échouée. Réessaie.';
+            _ttsError =
+                msg.contains('429') || msg.contains('RESOURCE_EXHAUSTED')
+                    ? '⏳ Quota audio dépassé. Réessaie dans 1 minute.'
+                    : '🎙️ Génération audio échouée. Réessaie.';
             _saveStatus = '';
           });
           return;
@@ -364,9 +379,10 @@ class _StoryScreenState extends State<StoryScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: const Text('✅ Histoire sauvegardée !'),
-        backgroundColor: AppColors.accent2,
+        backgroundColor: AppColors.forestGold,
         behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.all(AppRadius.md)),
+        shape: RoundedRectangleBorder(
+            borderRadius: AppRadius.all(AppRadius.md)),
       ),
     );
   }
@@ -382,47 +398,54 @@ class _StoryScreenState extends State<StoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.paper,
-      body: SafeArea(
-        child: Column(
-          children: [
-            _buildTopBar(),
-            if (_isSaving)
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.s20, vertical: AppSpacing.s4),
-                child: ClipRRect(
-                  borderRadius: AppRadius.all(4),
-                  child: LinearProgressIndicator(
-                    minHeight: 4,
-                    backgroundColor: AppColors.paper2,
-                    valueColor: const AlwaysStoppedAnimation(AppColors.accent2),
+      backgroundColor: AppColors.forestBg1,
+      body: ForestBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildTopBar(),
+              if (_isSaving)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.s20, vertical: AppSpacing.s4),
+                  child: ClipRRect(
+                    borderRadius: AppRadius.all(4),
+                    child: LinearProgressIndicator(
+                      minHeight: 4,
+                      backgroundColor: AppColors.forestBg3,
+                      valueColor: const AlwaysStoppedAnimation(
+                          AppColors.forestGold),
+                    ),
                   ),
                 ),
+              if (_saveStatus.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.s4),
+                  child: Text(_saveStatus,
+                      style: AppText.bodySmall
+                          .copyWith(color: AppColors.forestGold)),
+                ),
+              Expanded(
+                child: _error != null
+                    ? _buildError()
+                    : _isLoading
+                        ? _buildLoading()
+                        : _buildStory(),
               ),
-            if (_saveStatus.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.s4),
-                child: Text(_saveStatus, style: AppText.bodySmall),
-              ),
-            Expanded(
-              child: _error != null
-                  ? _buildError()
-                  : _isLoading
-                      ? _buildLoading()
-                      : _buildStory(),
-            ),
-            if (!_isLoading && _fullStory.isNotEmpty) _buildPlayer(),
-            if (_ttsError != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.s20, 0, AppSpacing.s20, AppSpacing.s8),
-                child: Text(_ttsError!,
+              if (!_isLoading && _fullStory.isNotEmpty) _buildPlayer(),
+              if (_ttsError != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.s20, 0, AppSpacing.s20, AppSpacing.s8),
+                  child: Text(
+                    _ttsError!,
                     textAlign: TextAlign.center,
                     style: AppText.bodySmall
-                        .copyWith(color: const Color(0xFFB3261E))),
-              ),
-          ],
+                        .copyWith(color: AppColors.forestBerry),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -430,8 +453,12 @@ class _StoryScreenState extends State<StoryScreen> {
 
   Widget _buildTopBar() {
     final title = widget.isLibraryMode
-        ? (widget.savedStory!.title.isEmpty ? 'Mon histoire' : widget.savedStory!.title)
-        : (widget.config!.storyTitle.isEmpty ? 'Mon histoire' : widget.config!.storyTitle);
+        ? (widget.savedStory!.title.isEmpty
+            ? 'Mon histoire'
+            : widget.savedStory!.title)
+        : (widget.config!.storyTitle.isEmpty
+            ? 'Mon histoire'
+            : widget.config!.storyTitle);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -449,7 +476,7 @@ class _StoryScreenState extends State<StoryScreen> {
             child: Text(
               title,
               textAlign: TextAlign.center,
-              style: AppText.titleMedium,
+              style: AppText.titleSerif,
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -481,20 +508,30 @@ class _StoryScreenState extends State<StoryScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            width: 110, height: 110,
+            width: 110,
+            height: 110,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [AppColors.accentSoft, AppColors.accent1],
-              ),
-              boxShadow: AppShadows.cta,
+              color: AppColors.forestBg2,
+              border: Border.all(
+                  color: AppColors.forestGold.withValues(alpha: 0.4),
+                  width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.forestGold.withValues(alpha: 0.3),
+                  blurRadius: 30,
+                  spreadRadius: 4,
+                ),
+              ],
             ),
             child: const Center(
               child: Text('📖', style: TextStyle(fontSize: 52)),
             ),
-          ),
+          ).animate(onPlay: (c) => c.repeat(reverse: true)).scaleXY(
+              begin: 0.96,
+              end: 1.04,
+              duration: 1600.ms,
+              curve: Curves.easeInOut),
           const SizedBox(height: AppSpacing.s24),
           Text('Gemini écrit ton histoire…', style: AppText.headlineMedium),
           const SizedBox(height: AppSpacing.s8),
@@ -503,7 +540,8 @@ class _StoryScreenState extends State<StoryScreen> {
             style: AppText.bodyMedium,
           ),
           const SizedBox(height: AppSpacing.s32),
-          const CircularProgressIndicator(color: AppColors.accent2, strokeWidth: 3),
+          const CircularProgressIndicator(
+              color: AppColors.forestGold, strokeWidth: 3),
         ],
       ),
     );
@@ -518,26 +556,26 @@ class _StoryScreenState extends State<StoryScreen> {
                 AppSpacing.s20, 0, AppSpacing.s20, AppSpacing.s8),
             padding: const EdgeInsets.all(AppSpacing.s12),
             decoration: BoxDecoration(
-              color: AppColors.accentSoft,
+              color: AppColors.forestBg3,
               borderRadius: AppRadius.all(AppRadius.md),
-              border: Border.all(color: AppColors.accent2, width: 1),
+              border: Border.all(
+                  color: AppColors.forestGold.withValues(alpha: 0.4), width: 1),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(children: [
                   const Icon(Icons.psychology_alt,
-                      color: AppColors.accent2, size: 14),
+                      color: AppColors.forestGold, size: 14),
                   const SizedBox(width: AppSpacing.s4),
                   Text('Prompt Gemini',
-                      style: AppText.bodySmall
-                          .copyWith(color: AppColors.accentInk,
-                              fontWeight: FontWeight.w700)),
+                      style: AppText.bodySmall.copyWith(
+                          color: AppColors.forestGold,
+                          fontWeight: FontWeight.w700)),
                 ]),
                 const SizedBox(height: AppSpacing.s4),
                 Text(_promptUsed,
-                    style: AppText.bodySmall
-                        .copyWith(fontFamily: 'monospace')),
+                    style: AppText.bodySmall.copyWith(fontFamily: 'monospace')),
               ],
             ),
           ),
@@ -548,9 +586,11 @@ class _StoryScreenState extends State<StoryScreen> {
             child: Container(
               padding: const EdgeInsets.all(AppSpacing.s20),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.forestBg2,
                 borderRadius: AppRadius.all(AppRadius.xl),
-                boxShadow: AppShadows.soft,
+                border: Border.all(
+                    color: AppColors.forestCream.withValues(alpha: 0.08),
+                    width: 1),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -558,12 +598,13 @@ class _StoryScreenState extends State<StoryScreen> {
                   MarkdownBody(
                     data: _displayedStory,
                     styleSheet: MarkdownStyleSheet(
-                      p: AppText.bodyLarge.copyWith(height: 1.85),
+                      p: AppText.bodyLarge.copyWith(
+                          height: 1.85, color: AppColors.forestCream),
                       strong: AppText.bodyLarge.copyWith(
-                          color: AppColors.accentInk,
+                          color: AppColors.forestGold,
                           fontWeight: FontWeight.w700),
                       em: AppText.bodyLarge.copyWith(
-                          color: AppColors.inkSoft,
+                          color: AppColors.forestGoldLight,
                           fontStyle: FontStyle.italic),
                     ),
                   ),
@@ -572,7 +613,7 @@ class _StoryScreenState extends State<StoryScreen> {
                       padding: const EdgeInsets.only(top: AppSpacing.s4),
                       child: Text('▊',
                           style: AppText.bodyLarge
-                              .copyWith(color: AppColors.accent2)),
+                              .copyWith(color: AppColors.forestGold)),
                     ),
                 ],
               ),
@@ -595,13 +636,9 @@ class _StoryScreenState extends State<StoryScreen> {
             Text(_error!,
                 textAlign: TextAlign.center, style: AppText.bodyMedium),
             const SizedBox(height: AppSpacing.s24),
-            Container(
-              decoration: BoxDecoration(
-                  borderRadius: AppRadius.all(AppRadius.xl),
-                  boxShadow: AppShadows.cta),
-              child: ElevatedButton(
-                  onPressed: _generateStory,
-                  child: const Text('Réessayer')),
+            ElevatedButton(
+              onPressed: _generateStory,
+              child: const Text('Réessayer'),
             ),
           ],
         ),
@@ -611,24 +648,24 @@ class _StoryScreenState extends State<StoryScreen> {
 
   Widget _buildPlayer() {
     final bool inactive = _isTyping;
-    final IconData playIcon =
-        _isPlaying ? Icons.pause : Icons.play_arrow;
-    final Color btnColor = inactive
-        ? AppColors.line
-        : _isPlaying
-            ? AppColors.sky
-            : _isPaused
-                ? AppColors.accent1
-                : AppColors.accent2;
+    final IconData playIcon = _isPlaying ? Icons.pause : Icons.play_arrow;
 
     return Container(
       margin: const EdgeInsets.all(AppSpacing.s16),
       padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.s20, vertical: AppSpacing.s16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.forestBg2,
         borderRadius: AppRadius.all(AppRadius.xl),
-        boxShadow: AppShadows.soft,
+        border: Border.all(
+            color: AppColors.forestCream.withValues(alpha: 0.1), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.forestInk.withValues(alpha: 0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
         children: [
@@ -639,13 +676,24 @@ class _StoryScreenState extends State<StoryScreen> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.s8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: _useGeminiAudio ? AppColors.accentSoft : AppColors.mint,
-                  borderRadius: AppRadius.all(AppRadius.xs),
+                  color: _useGeminiAudio
+                      ? AppColors.forestGold.withValues(alpha: 0.15)
+                      : AppColors.forestLeaf.withValues(alpha: 0.15),
+                  borderRadius: AppRadius.all(AppRadius.pill),
+                  border: Border.all(
+                    color: _useGeminiAudio
+                        ? AppColors.forestGold.withValues(alpha: 0.4)
+                        : AppColors.forestLeaf.withValues(alpha: 0.4),
+                    width: 1,
+                  ),
                 ),
                 child: Text(
                   _useGeminiAudio ? '🤖 Audio Gemini' : '📱 Voix native',
-                  style: AppText.bodySmall
-                      .copyWith(color: AppColors.accentInk),
+                  style: AppText.bodySmall.copyWith(
+                    color: _useGeminiAudio
+                        ? AppColors.forestGold
+                        : AppColors.forestLeaf,
+                  ),
                 ),
               ),
             ],
@@ -657,7 +705,7 @@ class _StoryScreenState extends State<StoryScreen> {
               child: Text(_audioStatus,
                   style: AppText.bodySmall.copyWith(
                       color: _isPlaying
-                          ? AppColors.accent2
+                          ? AppColors.forestGold
                           : AppColors.inkMute)),
             ),
           Row(
@@ -679,21 +727,32 @@ class _StoryScreenState extends State<StoryScreen> {
                   height: AppSize.iconBtnPlay,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: btnColor,
-                    boxShadow: inactive ? [] : AppShadows.cta,
+                    color: inactive
+                        ? AppColors.forestBg3
+                        : AppColors.forestGold,
+                    boxShadow: inactive
+                        ? null
+                        : [
+                            BoxShadow(
+                              color:
+                                  AppColors.forestGold.withValues(alpha: 0.5),
+                              blurRadius: 20,
+                              spreadRadius: 2,
+                            ),
+                          ],
                   ),
                   child: _isLoadingAudio
                       ? const Padding(
                           padding: EdgeInsets.all(20),
                           child: CircularProgressIndicator(
                               strokeWidth: 2.5,
-                              color: Colors.white),
+                              color: AppColors.forestInk),
                         )
                       : Icon(
                           inactive ? Icons.hourglass_top : playIcon,
                           color: inactive
                               ? AppColors.inkMute
-                              : Colors.white,
+                              : AppColors.forestInk,
                           size: 32,
                         ),
                 ),
@@ -733,19 +792,30 @@ class _StoryScreenState extends State<StoryScreen> {
       child: Column(
         children: [
           Container(
-            width: 44, height: 44,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: enabled ? AppColors.accentSoft : AppColors.paper2,
+              color: enabled
+                  ? AppColors.forestGold.withValues(alpha: 0.15)
+                  : AppColors.forestBg3,
               shape: BoxShape.circle,
+              border: Border.all(
+                color: enabled
+                    ? AppColors.forestGold.withValues(alpha: 0.4)
+                    : AppColors.line,
+                width: 1,
+              ),
             ),
             child: Icon(icon,
-                color: enabled ? AppColors.accent2 : AppColors.inkMute,
+                color:
+                    enabled ? AppColors.forestGold : AppColors.inkMute,
                 size: 22),
           ),
           const SizedBox(height: AppSpacing.s4),
           Text(label,
               style: AppText.bodySmall.copyWith(
-                  color: enabled ? AppColors.ink : AppColors.inkMute)),
+                  color:
+                      enabled ? AppColors.forestCream : AppColors.inkMute)),
         ],
       ),
     );
@@ -763,20 +833,27 @@ class _RoundBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        width: AppSize.iconBtnTopbar,
-        height: AppSize.iconBtnTopbar,
-        decoration: BoxDecoration(
-          color: active ? AppColors.accentSoft : Colors.white,
-          shape: BoxShape.circle,
-          border: Border.all(
-            color: active ? AppColors.accent2 : AppColors.line,
-            width: 1.5,
+      child: Opacity(
+        opacity: onTap == null ? 0.35 : 1.0,
+        child: Container(
+          width: AppSize.iconBtnTopbar,
+          height: AppSize.iconBtnTopbar,
+          decoration: BoxDecoration(
+            color: active
+                ? AppColors.forestGold.withValues(alpha: 0.2)
+                : AppColors.forestBg2,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: active
+                  ? AppColors.forestGold.withValues(alpha: 0.6)
+                  : AppColors.forestCream.withValues(alpha: 0.2),
+              width: 1.5,
+            ),
           ),
-          boxShadow: AppShadows.soft,
+          child: Icon(icon,
+              color: active ? AppColors.forestGold : AppColors.forestCream,
+              size: 18),
         ),
-        child: Icon(icon,
-            color: active ? AppColors.accent2 : AppColors.ink, size: 18),
       ),
     );
   }

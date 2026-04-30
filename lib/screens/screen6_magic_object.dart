@@ -5,7 +5,8 @@ import '../models/story_config.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
-import '../widgets/wizard_scaffold.dart';
+import '../widgets/forest_orb.dart';
+import '../widgets/forest_step_frame.dart';
 
 class MagicObjectScreen extends StatefulWidget {
   final StoryConfig config;
@@ -21,7 +22,6 @@ class _MagicObjectScreenState extends State<MagicObjectScreen> {
   bool _isListening = false;
   bool _speechAvailable = false;
 
-  // Suggestions sous forme emoji + label
   static const _suggestions = [
     ('🪄', 'Baguette'),
     ('🗝️', 'Clé'),
@@ -31,8 +31,8 @@ class _MagicObjectScreenState extends State<MagicObjectScreen> {
     ('🧭', 'Boussole'),
   ];
 
-  static const _bgColors = [
-    AppColors.accentSoft,
+  static const _orbColors = [
+    AppColors.forestGold,
     AppColors.lilac,
     AppColors.butter,
     AppColors.mint,
@@ -76,23 +76,18 @@ class _MagicObjectScreenState extends State<MagicObjectScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WizardScaffold(
+    return ForestStepFrame(
       step: 6,
-      pastilleColor: AppColors.lilac,
-      pastilleIcon: Icons.auto_fix_high,
-      title: 'L\'objet magique',
-      subtitle: 'Quel objet magique accompagne ton héros ?',
+      microLabel: 'l\'objet magique',
       voiceInstruction:
           'Quel objet magique accompagne ton héros ? Une baguette, une clé, une étoile ?',
       canContinue: _controller.text.trim().isNotEmpty,
-      continueLabel: '✨ Créer l\'histoire !',
       onContinue: () {
         widget.config.magicObject = _controller.text.trim();
         context.push('/generating', extra: widget.config);
       },
       content: Column(
         children: [
-          // Champ texte (résultat micro ou saisie)
           TextField(
             controller: _controller,
             onChanged: (_) => setState(() {}),
@@ -102,26 +97,30 @@ class _MagicObjectScreenState extends State<MagicObjectScreen> {
               hintText: 'Ton objet magique…',
             ),
           ),
-          const SizedBox(height: AppSpacing.s32),
-          // Gros bouton micro centré
+          const SizedBox(height: AppSpacing.s24),
           Center(
             child: GestureDetector(
               onTap: _speechAvailable ? _toggleListening : null,
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                width: 100,
-                height: 100,
+                width: 88,
+                height: 88,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _isListening
-                      ? AppColors.accent2
-                      : AppColors.accentSoft,
-                  boxShadow: _isListening ? AppShadows.cta : AppShadows.soft,
+                  color: AppColors.forestGold,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.forestGold.withValues(
+                          alpha: _isListening ? 0.7 : 0.35),
+                      blurRadius: _isListening ? 24 : 12,
+                      spreadRadius: _isListening ? 5 : 0,
+                    ),
+                  ],
                 ),
                 child: Icon(
                   _isListening ? Icons.mic : Icons.mic_none,
-                  size: 46,
-                  color: _isListening ? Colors.white : AppColors.accent2,
+                  size: 42,
+                  color: AppColors.forestInk,
                 ),
               ),
             ),
@@ -132,51 +131,26 @@ class _MagicObjectScreenState extends State<MagicObjectScreen> {
               _isListening
                   ? 'J\'écoute…'
                   : _speechAvailable
-                      ? 'Appuie pour dicter'
-                      : 'Micro non disponible',
-              style: AppText.bodySmall.copyWith(
-                color:
-                    _isListening ? AppColors.accent2 : AppColors.inkMute,
-              ),
+                      ? '· appuie pour dicter ·'
+                      : '· micro non disponible ·',
+              style: AppText.microLabel,
             ),
           ),
           const SizedBox(height: AppSpacing.s24),
-          // Grille de suggestions
-          GridView.count(
-            crossAxisCount: 3,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            alignment: WrapAlignment.center,
             children: List.generate(_suggestions.length, (i) {
               final (emoji, label) = _suggestions[i];
               final fullText = '$emoji $label';
-              final selected = _controller.text == fullText;
-              return GestureDetector(
+              return ForestOrb(
+                emoji: emoji,
+                label: label,
+                isSelected: _controller.text == fullText,
+                orbColor: _orbColors[i % _orbColors.length],
+                size: 80,
                 onTap: () => setState(() => _controller.text = fullText),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  decoration: BoxDecoration(
-                    color: selected ? AppColors.accentSoft : _bgColors[i],
-                    borderRadius: AppRadius.all(AppRadius.lg),
-                    border: Border.all(
-                      color: selected
-                          ? AppColors.accent2
-                          : Colors.transparent,
-                      width: 3,
-                    ),
-                    boxShadow: selected ? AppShadows.soft : null,
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(emoji,
-                          style: const TextStyle(fontSize: 32)),
-                      const SizedBox(height: AppSpacing.s4),
-                      Text(label, style: AppText.labelLarge),
-                    ],
-                  ),
-                ),
               );
             }),
           ),

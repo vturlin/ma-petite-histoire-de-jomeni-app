@@ -4,6 +4,7 @@ import '../services/voice_guide_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
+import '../widgets/forest_background.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -47,8 +48,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.paper,
-      body: SafeArea(
+      backgroundColor: AppColors.forestBg1,
+      body: ForestBackground(child: SafeArea(
         child: Column(
           children: [
             // Top bar
@@ -209,7 +210,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 
@@ -300,9 +301,10 @@ class _SettingSlider extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpacing.s16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.forestBg2,
         borderRadius: AppRadius.all(AppRadius.xl),
-        boxShadow: AppShadows.soft,
+        border: Border.all(
+            color: AppColors.forestCream.withValues(alpha: 0.08), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -402,9 +404,10 @@ class _VoicePicker extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.all(AppSpacing.s16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.forestBg2,
           borderRadius: AppRadius.all(AppRadius.xl),
-          boxShadow: AppShadows.soft,
+          border: Border.all(
+              color: AppColors.forestCream.withValues(alpha: 0.08), width: 1),
         ),
         child: Text(
           'Aucune voix française trouvée sur cet appareil.',
@@ -415,9 +418,10 @@ class _VoicePicker extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.forestBg2,
         borderRadius: AppRadius.all(AppRadius.xl),
-        boxShadow: AppShadows.soft,
+        border: Border.all(
+            color: AppColors.forestCream.withValues(alpha: 0.08), width: 1),
       ),
       child: Column(
         children: [
@@ -487,7 +491,7 @@ class _VoiceTile extends StatelessWidget {
                 ),
               ),
               child: isSelected
-                  ? const Icon(Icons.check, color: Colors.white, size: 14)
+                  ? const Icon(Icons.check, color: AppColors.forestInk, size: 14)
                   : null,
             ),
             const SizedBox(width: AppSpacing.s12),
@@ -523,12 +527,12 @@ class _RoundBtn extends StatelessWidget {
         width: AppSize.iconBtnTopbar,
         height: AppSize.iconBtnTopbar,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.forestBg2,
           shape: BoxShape.circle,
-          border: Border.all(color: AppColors.line, width: 1.5),
-          boxShadow: AppShadows.soft,
+          border: Border.all(
+              color: AppColors.forestCream.withValues(alpha: 0.2), width: 1.5),
         ),
-        child: Icon(icon, color: AppColors.ink, size: 18),
+        child: Icon(icon, color: AppColors.forestCream, size: 18),
       ),
     );
   }

@@ -5,7 +5,7 @@ import '../models/story_config.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
-import '../widgets/wizard_scaffold.dart';
+import '../widgets/forest_step_frame.dart';
 
 class HeroNameScreen extends StatefulWidget {
   final StoryConfig config;
@@ -57,13 +57,11 @@ class _HeroNameScreenState extends State<HeroNameScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return WizardScaffold(
+    return ForestStepFrame(
       step: 3,
-      pastilleColor: AppColors.lilac,
-      pastilleIcon: Icons.mic_none,
-      title: 'Nomme ton héros',
-      subtitle: 'Dis ou écris le nom de ton héros',
-      voiceInstruction: 'Comment s\'appelle ton héros ? Tu peux le dire à voix haute ou l\'écrire.',
+      microLabel: 'nomme ton héros',
+      voiceInstruction:
+          'Comment s\'appelle ton héros ? Tu peux le dire à voix haute ou l\'écrire.',
       canContinue: _controller.text.trim().isNotEmpty,
       onContinue: () {
         widget.config.heroName = _controller.text.trim();
@@ -71,7 +69,6 @@ class _HeroNameScreenState extends State<HeroNameScreen> {
       },
       content: Column(
         children: [
-          // Input
           TextField(
             controller: _controller,
             onChanged: (_) => setState(() {}),
@@ -82,7 +79,6 @@ class _HeroNameScreenState extends State<HeroNameScreen> {
             ),
           ),
           const SizedBox(height: AppSpacing.s40),
-          // Bouton micro
           Center(
             child: GestureDetector(
               onTap: _speechAvailable ? _toggleListening : null,
@@ -92,16 +88,19 @@ class _HeroNameScreenState extends State<HeroNameScreen> {
                 height: 88,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: _isListening
-                      ? AppColors.accent2
-                      : AppColors.accentSoft,
-                  boxShadow: _isListening ? AppShadows.cta : AppShadows.soft,
+                  color: AppColors.forestGold,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.forestGold.withValues(
+                          alpha: _isListening ? 0.7 : 0.35),
+                      blurRadius: _isListening ? 24 : 12,
+                      spreadRadius: _isListening ? 5 : 0,
+                    ),
+                  ],
                 ),
                 child: Icon(
                   _isListening ? Icons.mic : Icons.mic_none,
-                  color: _isListening
-                      ? Colors.white
-                      : AppColors.accent2,
+                  color: AppColors.forestInk,
                   size: 38,
                 ),
               ),
@@ -113,13 +112,9 @@ class _HeroNameScreenState extends State<HeroNameScreen> {
               _isListening
                   ? 'J\'écoute…'
                   : _speechAvailable
-                      ? 'Appuie pour parler'
-                      : 'Micro non disponible',
-              style: AppText.bodySmall.copyWith(
-                color: _isListening
-                    ? AppColors.accent2
-                    : AppColors.inkMute,
-              ),
+                      ? '· appuie pour parler ·'
+                      : '· micro non disponible ·',
+              style: AppText.microLabel,
             ),
           ),
         ],

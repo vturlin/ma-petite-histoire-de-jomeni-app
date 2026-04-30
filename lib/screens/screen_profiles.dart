@@ -7,6 +7,7 @@ import '../services/user_profile_service.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
+import '../widgets/forest_background.dart';
 import '../widgets/profile_sheet.dart';
 
 class ProfilesScreen extends StatefulWidget {
@@ -19,16 +20,15 @@ class ProfilesScreen extends StatefulWidget {
 class _ProfilesScreenState extends State<ProfilesScreen> {
   List<UserProfile> _profiles = [];
 
-  // Couleurs catégorielles du design system
-  static const List<Color> _cardColors = [
+  static const List<Color> _orbColors = [
     AppColors.rose,
-    AppColors.accentSoft,
-    AppColors.butter,
+    AppColors.mint,
     AppColors.sky,
     AppColors.lilac,
-    AppColors.mint,
+    AppColors.butter,
     AppColors.moss,
-    AppColors.accent1,
+    AppColors.coral,
+    AppColors.peach,
   ];
 
   @override
@@ -50,85 +50,89 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.paper,
-      body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: AppSpacing.s40),
-            // Titre
-            Text(
-              'Qui écoute aujourd\'hui ?',
-              style: AppText.headlineLarge,
-              textAlign: TextAlign.center,
-            ).animate().fadeIn(duration: 400.ms),
-            const SizedBox(height: AppSpacing.s8),
-            Text(
-              'Sélectionne ton personnage',
-              style: AppText.bodyMedium,
-              textAlign: TextAlign.center,
-            ).animate().fadeIn(delay: 100.ms),
-            const SizedBox(height: AppSpacing.s32),
-            // Grille
-            Expanded(
-              child: Padding(
-                padding: AppSpacing.screenH,
-                child: GridView.builder(
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: AppSpacing.s16,
-                    mainAxisSpacing: AppSpacing.s16,
-                    childAspectRatio: 0.9,
-                  ),
-                  itemCount: _profiles.length + 1,
-                  itemBuilder: (context, index) {
-                    if (index == _profiles.length) {
-                      return _AddProfileCard(onTap: _showCreateSheet)
-                          .animate()
-                          .scale(
+      backgroundColor: AppColors.forestBg1,
+      body: ForestBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              const SizedBox(height: AppSpacing.s40),
+              Text(
+                'Qui écoute aujourd\'hui ?',
+                style: AppText.displayLarge,
+                textAlign: TextAlign.center,
+              ).animate().fadeIn(duration: 400.ms),
+              const SizedBox(height: AppSpacing.s8),
+              Text(
+                '· choisis ton personnage ·',
+                style: AppText.microLabel,
+                textAlign: TextAlign.center,
+              ).animate().fadeIn(delay: 100.ms),
+              const SizedBox(height: AppSpacing.s32),
+              Expanded(
+                child: Padding(
+                  padding: AppSpacing.screenH,
+                  child: GridView.builder(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: AppSpacing.s16,
+                      mainAxisSpacing: AppSpacing.s16,
+                      childAspectRatio: 0.88,
+                    ),
+                    itemCount: _profiles.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == _profiles.length) {
+                        return _AddProfileCard(onTap: _showCreateSheet)
+                            .animate()
+                            .scale(
+                              delay: Duration(milliseconds: index * 80),
+                              duration: 300.ms,
+                              curve: Curves.elasticOut,
+                            );
+                      }
+                      final profile = _profiles[index];
+                      return _ProfileCard(
+                        profile: profile,
+                        color: _orbColors[
+                            profile.colorIndex % _orbColors.length],
+                        onTap: () => _selectProfile(profile),
+                        onLongPress: () => _showProfileOptions(profile),
+                      ).animate().scale(
                             delay: Duration(milliseconds: index * 80),
                             duration: 300.ms,
                             curve: Curves.elasticOut,
                           );
-                    }
-                    final profile = _profiles[index];
-                    return _ProfileCard(
-                      profile: profile,
-                      color: _cardColors[profile.colorIndex % _cardColors.length],
-                      onTap: () => _selectProfile(profile),
-                      onLongPress: () => _showProfileOptions(profile),
-                    ).animate().scale(
-                          delay: Duration(milliseconds: index * 80),
-                          duration: 300.ms,
-                          curve: Curves.elasticOut,
-                        );
-                  },
+                    },
+                  ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.s20, AppSpacing.s16, AppSpacing.s20, AppSpacing.s24),
-              child: Text(
-                'Appuie longtemps pour modifier ou supprimer',
-                style: AppText.bodySmall.copyWith(color: AppColors.inkMute),
-                textAlign: TextAlign.center,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.s20,
+                    AppSpacing.s16,
+                    AppSpacing.s20,
+                    AppSpacing.s24),
+                child: Text(
+                  '· appuie longtemps pour modifier ·',
+                  style: AppText.microLabel,
+                  textAlign: TextAlign.center,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
-
-  // ── API key dialog ──────────────────────────────────────────────────────────
 
   Future<void> _selectApiKey() async {
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.all(AppRadius.xl)),
+        backgroundColor: AppColors.forestBg2,
+        shape:
+            RoundedRectangleBorder(borderRadius: AppRadius.all(AppRadius.xl)),
         title: Text('🔑 Clé API à utiliser', style: AppText.titleLarge),
         content: Text(
           'Choisis la clé Gemini pour cette session.',
@@ -138,7 +142,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
           _ApiKeyOption(
             label: '🧪 Gemini API Key',
             description: '…77kQ',
-            color: AppColors.accent2,
+            color: AppColors.forestGold,
             onTap: () {
               apiKeyService.selectProduction();
               Navigator.pop(context);
@@ -158,14 +162,13 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     );
   }
 
-  // ── Actions profil ──────────────────────────────────────────────────────────
-
   Future<void> _showProfileOptions(UserProfile profile) async {
     await showDialog<void>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: AppRadius.all(AppRadius.xl)),
+        backgroundColor: AppColors.forestBg2,
+        shape:
+            RoundedRectangleBorder(borderRadius: AppRadius.all(AppRadius.xl)),
         title: Row(
           children: [
             Text(profile.emoji, style: const TextStyle(fontSize: 24)),
@@ -177,7 +180,8 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.edit_outlined, color: AppColors.inkSoft),
+              leading: const Icon(Icons.edit_outlined,
+                  color: AppColors.forestGold),
               title: Text('Modifier', style: AppText.bodyLarge),
               onTap: () {
                 Navigator.pop(context);
@@ -186,10 +190,10 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.delete_outline,
-                  color: Color(0xFFB3261E)),
+                  color: AppColors.forestBerry),
               title: Text('Supprimer',
-                  style: AppText.bodyLarge.copyWith(
-                      color: const Color(0xFFB3261E))),
+                  style: AppText.bodyLarge
+                      .copyWith(color: AppColors.forestBerry)),
               onTap: () {
                 Navigator.pop(context);
                 _deleteProfile(profile);
@@ -205,7 +209,7 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.forestBg2,
         shape:
             RoundedRectangleBorder(borderRadius: AppRadius.all(AppRadius.xl)),
         title: Text('Supprimer ${profile.name} ?', style: AppText.titleLarge),
@@ -217,13 +221,14 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text('Annuler',
-                style: AppText.labelLarge.copyWith(color: AppColors.inkSoft)),
+                style:
+                    AppText.labelLarge.copyWith(color: AppColors.inkSoft)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
             child: Text('Supprimer',
                 style: AppText.labelLarge
-                    .copyWith(color: const Color(0xFFB3261E))),
+                    .copyWith(color: AppColors.forestBerry)),
           ),
         ],
       ),
@@ -284,9 +289,27 @@ class _ProfileCard extends StatelessWidget {
       onLongPress: onLongPress,
       child: Container(
         decoration: BoxDecoration(
-          color: color,
-          borderRadius: AppRadius.all(AppRadius.lg),
-          boxShadow: AppShadows.soft,
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          gradient: RadialGradient(
+            center: const Alignment(-0.3, -0.4),
+            radius: 1.2,
+            colors: [
+              Color.lerp(color, Colors.white, 0.2)!.withValues(alpha: 0.35),
+              color.withValues(alpha: 0.2),
+              color.withValues(alpha: 0.08),
+            ],
+          ),
+          border: Border.all(
+            color: color.withValues(alpha: 0.45),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.22),
+              blurRadius: 20,
+              offset: const Offset(0, 6),
+            ),
+          ],
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -305,8 +328,10 @@ class _ProfileCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(
                     horizontal: AppSpacing.s8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.5),
-                  borderRadius: AppRadius.all(AppRadius.xs),
+                  color: color.withValues(alpha: 0.22),
+                  borderRadius: AppRadius.all(AppRadius.pill),
+                  border:
+                      Border.all(color: color.withValues(alpha: 0.4), width: 1),
                 ),
                 child: Text(
                   '${profile.age!.emoji} ${profile.age!.label}',
@@ -333,25 +358,32 @@ class _AddProfileCard extends StatelessWidget {
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: AppRadius.all(AppRadius.lg),
-          border: Border.all(color: AppColors.line2, width: 2),
-          boxShadow: AppShadows.soft,
+          borderRadius: BorderRadius.circular(AppRadius.xl),
+          color: AppColors.forestBg2,
+          border: Border.all(
+            color: AppColors.forestGold.withValues(alpha: 0.35),
+            width: 1.5,
+          ),
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 48,
-              height: 48,
+              width: 52,
+              height: 52,
               decoration: BoxDecoration(
-                color: AppColors.accentSoft,
-                borderRadius: AppRadius.all(AppRadius.md),
+                shape: BoxShape.circle,
+                color: AppColors.forestGold.withValues(alpha: 0.15),
+                border: Border.all(
+                  color: AppColors.forestGold.withValues(alpha: 0.5),
+                  width: 1.5,
+                ),
               ),
-              child: const Icon(Icons.add, color: AppColors.accent2, size: 28),
+              child:
+                  const Icon(Icons.add, color: AppColors.forestGold, size: 28),
             ),
             const SizedBox(height: AppSpacing.s8),
-            Text('Ajouter', style: AppText.titleMedium),
+            Text('Nouveau profil', style: AppText.titleMedium),
           ],
         ),
       ),
@@ -388,13 +420,12 @@ class _ApiKeyOption extends StatelessWidget {
           decoration: BoxDecoration(
             color: color.withValues(alpha: 0.12),
             borderRadius: AppRadius.all(AppRadius.md),
-            border: Border.all(color: color, width: 1.5),
+            border: Border.all(color: color.withValues(alpha: 0.5), width: 1.5),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label,
-                  style: AppText.labelLarge.copyWith(color: AppColors.ink)),
+              Text(label, style: AppText.labelLarge),
               const SizedBox(height: 2),
               Text(description, style: AppText.bodySmall),
             ],
