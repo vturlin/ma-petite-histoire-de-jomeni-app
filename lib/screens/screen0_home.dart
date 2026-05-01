@@ -49,7 +49,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     // Pill profil
                     GestureDetector(
-                      onTap: () => context.push('/profiles'),
+                      onTap: () async {
+                        await context.push('/profiles');
+                        if (mounted) setState(() {});
+                      },
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 7),
