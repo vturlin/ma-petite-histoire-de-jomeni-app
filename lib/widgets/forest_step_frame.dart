@@ -41,18 +41,17 @@ class ForestStepFrame extends StatefulWidget {
 class _ForestStepFrameState extends State<ForestStepFrame> {
   bool _isSpeaking = false;
 
-  // ── Constantes de layout (doivent correspondre aux valeurs dans Column) ──────
-  static const double _luluSize   = 56;
-  static const double _luluBoxH   = _luluSize * 1.6; // 89.6
-  static const double _luluHalf   = _luluBoxH / 2;   // 44.8
-  static const double _playBtnR   = 36.0;             // rayon bouton play (72px)
-  static const double _contBtnR   = 38.0;             // rayon bouton suite (76px)
-  static const double _headerH    = 58.0;             // header (~50px) + SizedBox(8)
-  static const double _footPadR   = 24.0;
-  static const double _footPadB   = 24.0;
-  // Centre y du bouton play depuis le top de SafeArea
-  static const double _playBtnCenterY =
-      _headerH + _luluBoxH + 8 + _playBtnR; // ≈ 192
+  // ── Constantes layout ────────────────────────────────────────────────────────
+  static const double _luluSize = 56;
+  static const double _luluBoxH = _luluSize * 1.6; // 89.6
+  static const double _luluHalf = _luluBoxH / 2;   // 44.8
+  static const double _playBtnR = 36.0;             // rayon gros bouton play (72px)
+  static const double _contBtnR = 38.0;             // rayon bouton suite (76px)
+  static const double _footPadB = 24.0;
+
+  // Header : padding-top(12) + row(~52px title+progress) + SizedBox(8)
+  //          + reserved(luluBoxH+16) + playBtnR = ≈ 214
+  static const double _playBtnCenterY = 214.0;
 
   @override
   void initState() {
@@ -82,22 +81,20 @@ class _ForestStepFrameState extends State<ForestStepFrame> {
     if (mounted) setState(() => _isSpeaking = false);
   }
 
-  /// Calcule l'alignement de Lulu en coordonnées [-1, 1] selon l'état.
+  /// Position de Lulu selon l'état canContinue.
   Alignment _luluAlignment(double safeW, double safeH) {
     final hw = safeW / 2;
     final hh = safeH / 2;
-
     double lx, ly;
 
     if (!widget.canContinue) {
-      // À DROITE du bouton play, légèrement remontée pour aligner visuellement
+      // À droite du gros bouton play, remontée pour aligner visuellement
       lx = hw + _playBtnR + 10 + _luluHalf;
       ly = _playBtnCenterY - 50;
     } else {
-      // AU-DESSUS du bouton continuer
-      lx = safeW - _footPadR - _contBtnR;      // même x que bouton suite
-      ly = safeH - _footPadB - _contBtnR        // centre bouton suite
-          - _contBtnR - 10 - _luluHalf;         // moins la distance vers Lulu
+      // Près du bouton continuer — décalée à droite et plus basse
+      lx = safeW - _luluHalf + 32;                          // dépasse le bord droit
+      ly = safeH - _footPadB - _contBtnR * 2 + 28 - _luluHalf; // plus basse, frôle le bouton
     }
 
     return Alignment(
@@ -120,23 +117,39 @@ class _ForestStepFrameState extends State<ForestStepFrame> {
 
               return Stack(
                 children: [
-                  // ── Colonne principale ──────────────────────────────────────
+                  // ── Colonne principale ────────────────────────────────────────
                   Column(
                     children: [
-                      // Header
+                      // ── Header : titre centré + progression ─────────────────
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            // Bouton retour
                             _CircleBtn(
                               icon: Icons.arrow_back,
                               onTap: widget.onBack ?? () => context.pop(),
                             ),
-                            const Spacer(),
-                            ForestProgress(
-                                currentStep: widget.step,
-                                totalSteps: widget.totalSteps),
-                            const Spacer(),
+                            // Titre + progression centrés
+                            Expanded(
+                              child: Column(
+                                children: [
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    widget.microLabel,
+                                    style: AppText.headlineMedium,
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  ForestProgress(
+                                    currentStep: widget.step,
+                                    totalSteps: widget.totalSteps,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            // Bouton fermer
                             _CircleBtn(
                               icon: Icons.close,
                               onTap: () {
@@ -147,10 +160,12 @@ class _ForestStepFrameState extends State<ForestStepFrame> {
                           ],
                         ),
                       ),
+
                       const SizedBox(height: 8),
-                      // Espace réservé pour Lulu — garde la colonne stable
-                      const SizedBox(height: _luluBoxH + 8),
-                      // Bouton audio (rejouer l'instruction)
+                      // Espace réservé pour Lulu flottante
+                      const SizedBox(height: _luluBoxH + 16),
+
+                      // ── Gros bouton lecture (rejouer instruction) ───────────
                       GestureDetector(
                         onTap: _isSpeaking ? null : _replay,
                         child: AnimatedContainer(
@@ -189,11 +204,10 @@ class _ForestStepFrameState extends State<ForestStepFrame> {
                               end: _isSpeaking ? 1.05 : 1.0,
                               duration: 800.ms,
                               curve: Curves.easeInOut),
-                      const SizedBox(height: 10),
-                      Text('· ${widget.microLabel} ·',
-                          style: AppText.microLabel),
+
                       const SizedBox(height: 12),
-                      // Contenu scrollable
+
+                      // ── Contenu scrollable ──────────────────────────────────
                       Expanded(
                         child: SingleChildScrollView(
                           padding: const EdgeInsets.symmetric(
@@ -201,7 +215,8 @@ class _ForestStepFrameState extends State<ForestStepFrame> {
                           child: widget.content,
                         ),
                       ),
-                      // Footer
+
+                      // ── Footer ───────────────────────────────────────────────
                       Padding(
                         padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
                         child: Row(
@@ -212,7 +227,7 @@ class _ForestStepFrameState extends State<ForestStepFrame> {
                               onTap: widget.onBack ?? () => context.pop(),
                               size: 54,
                             ),
-                            // Bouton continuer — grandit quand sélectionnable
+                            // Bouton continuer — grandit à l'activation
                             GestureDetector(
                               onTap: widget.canContinue
                                   ? widget.onContinue
@@ -255,7 +270,7 @@ class _ForestStepFrameState extends State<ForestStepFrame> {
                     ],
                   ),
 
-                  // ── Lulu volante ─────────────────────────────────────────────
+                  // ── Lulu flottante ────────────────────────────────────────────
                   AnimatedAlign(
                     duration: const Duration(milliseconds: 750),
                     curve: Curves.elasticOut,
@@ -294,7 +309,8 @@ class _CircleBtn extends StatelessWidget {
           shape: BoxShape.circle,
           color: AppColors.forestBg2,
           border: Border.all(
-              color: AppColors.forestCream.withValues(alpha: 0.2), width: 1.5),
+              color: AppColors.forestCream.withValues(alpha: 0.2),
+              width: 1.5),
         ),
         child: Icon(icon, color: AppColors.forestCream, size: size * 0.45),
       ),

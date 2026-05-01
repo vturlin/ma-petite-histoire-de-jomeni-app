@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import '../models/story_config.dart';
+import '../models/user_profile.dart';
 
 class GeminiService {
   late final GenerativeModel _model;
@@ -44,16 +45,36 @@ class GeminiService {
     final character = config.characterType == CharacterType.myself
         ? "l'enfant lui-même"
         : 'un héros nommé $heroName';
-    final theme = config.theme?.label ?? 'aventure';
-    final type = config.storyType?.label ?? 'aventure';
+    final theme = config.themeLabel.isNotEmpty ? config.themeLabel : 'aventure';
+    final typeLabel = config.storyType?.label ?? 'Aventure';
+    final typeHint  = config.storyType?.promptHint ?? '';
     final magicObject = config.magicObject.isEmpty
         ? 'un objet magique mystérieux'
         : config.magicObject;
 
+    // Genre : explicite si l'enfant joue son propre rôle, déduit du prénom sinon
+    String genderLine;
+    if (config.characterType == CharacterType.myself) {
+      genderLine = switch (config.childGender) {
+        ProfileGender.boy =>
+          '- Genre du héros : garçon — accorde tous les adjectifs et participes au masculin\n',
+        ProfileGender.girl =>
+          '- Genre du héros : fille — accorde tous les adjectifs et participes au féminin\n',
+        null => '',
+      };
+    } else {
+      // Héros nommé : Gemini déduit le genre à partir du prénom
+      genderLine = heroName != 'le héros'
+          ? '- Genre du héros : à déduire du prénom "$heroName" — accorde les adjectifs et participes en conséquence\n'
+          : '';
+    }
+
     return 'Écris une histoire pour enfants de $age ans avec :\n'
         '- Personnage principal : $character\n'
+        '$genderLine'
         '- Univers / thème : $theme\n'
-        '- Type d\'histoire : $type\n'
+        '- Type d\'histoire : $typeLabel\n'
+        '- Consignes de style pour ce type : $typeHint\n'
         '- Objet magique : $magicObject\n\n'
         'L\'histoire doit durer 3-5 minutes à lire à voix haute (400-600 mots). '
         'Termine sur un message positif ou une leçon douce. '

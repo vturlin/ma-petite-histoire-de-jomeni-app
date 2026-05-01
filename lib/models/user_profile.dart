@@ -1,3 +1,12 @@
+enum ProfileGender {
+  boy('Garçon', '👦'),
+  girl('Fille', '👧');
+
+  final String label;
+  final String emoji;
+  const ProfileGender(this.label, this.emoji);
+}
+
 /// Tranche d'âge stockée dans le profil (valeurs identiques à AgeCategory).
 enum ProfileAge {
   toddler('2-4 ans', '👶'),
@@ -16,7 +25,8 @@ class UserProfile {
   final String emoji;
   final int colorIndex;
   final DateTime createdAt;
-  final ProfileAge? age; // null = pas défini, sera demandé à la création
+  final ProfileAge? age;
+  final ProfileGender? gender;
 
   const UserProfile({
     required this.id,
@@ -25,6 +35,7 @@ class UserProfile {
     required this.colorIndex,
     required this.createdAt,
     this.age,
+    this.gender,
   });
 
   static const List<int> availableColors = [0, 1, 2, 3, 4, 5, 6, 7];
@@ -42,6 +53,7 @@ class UserProfile {
         'colorIndex': colorIndex,
         'createdAt': createdAt.toIso8601String(),
         if (age != null) 'age': age!.name,
+        if (gender != null) 'gender': gender!.name,
       };
 
   factory UserProfile.fromMap(Map<dynamic, dynamic> map) => UserProfile(
@@ -54,6 +66,12 @@ class UserProfile {
             ? ProfileAge.values.firstWhere(
                 (e) => e.name == map['age'],
                 orElse: () => ProfileAge.child,
+              )
+            : null,
+        gender: map['gender'] != null
+            ? ProfileGender.values.firstWhere(
+                (e) => e.name == map['gender'],
+                orElse: () => ProfileGender.boy,
               )
             : null,
       );

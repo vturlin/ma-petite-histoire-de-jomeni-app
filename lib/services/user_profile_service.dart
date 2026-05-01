@@ -25,6 +25,7 @@ class UserProfileService {
     required String emoji,
     required int colorIndex,
     ProfileAge? age,
+    ProfileGender? gender,
   }) async {
     final profile = UserProfile(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
@@ -33,6 +34,7 @@ class UserProfileService {
       colorIndex: colorIndex,
       createdAt: DateTime.now(),
       age: age,
+      gender: gender,
     );
     await _box.put(profile.id, profile.toMap());
     return profile;

@@ -26,6 +26,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
   late String _selectedEmoji;
   late int _selectedColor;
   ProfileAge? _selectedAge;
+  ProfileGender? _selectedGender;
 
   bool get _isEdit => widget.existingProfile != null;
 
@@ -48,6 +49,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
     _selectedEmoji = p?.emoji ?? UserProfile.availableEmojis.first;
     _selectedColor = p?.colorIndex ?? 0;
     _selectedAge = p?.age;
+    _selectedGender = p?.gender;
   }
 
   @override
@@ -260,6 +262,57 @@ class _ProfileSheetState extends State<ProfileSheet> {
               }),
             ),
             const SizedBox(height: AppSpacing.s20),
+            // Sexe
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Sexe (optionnel)', style: AppText.bodySmall),
+            ),
+            const SizedBox(height: AppSpacing.s8),
+            Row(
+              children: ProfileGender.values.map((g) {
+                final selected = _selectedGender == g;
+                return Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    child: GestureDetector(
+                      onTap: () => setState(() =>
+                          _selectedGender = selected ? null : g),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? AppColors.accentSoft
+                              : AppColors.paper2,
+                          borderRadius: AppRadius.all(AppRadius.sm),
+                          border: Border.all(
+                            color: selected
+                                ? AppColors.accent2
+                                : AppColors.line,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(g.emoji,
+                                style: const TextStyle(fontSize: 18)),
+                            const SizedBox(width: AppSpacing.s4),
+                            Text(g.label,
+                                style: AppText.labelLarge.copyWith(
+                                  color: selected
+                                      ? AppColors.accentInk
+                                      : AppColors.ink,
+                                )),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: AppSpacing.s20),
             // Âge
             Align(
               alignment: Alignment.centerLeft,
@@ -334,6 +387,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
                               colorIndex: _selectedColor,
                               createdAt: widget.existingProfile!.createdAt,
                               age: _selectedAge,
+                              gender: _selectedGender,
                             );
                             await userProfileService.update(updated);
                             if (context.mounted) {
@@ -346,6 +400,7 @@ class _ProfileSheetState extends State<ProfileSheet> {
                               emoji: _selectedEmoji,
                               colorIndex: _selectedColor,
                               age: _selectedAge,
+                              gender: _selectedGender,
                             );
                             if (context.mounted) {
                               Navigator.pop(context);

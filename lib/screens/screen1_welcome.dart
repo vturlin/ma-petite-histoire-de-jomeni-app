@@ -35,6 +35,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         );
       }
     }
+    widget.config.childGender ??= userProfileService.currentProfile?.gender;
     _initSpeech();
   }
 
