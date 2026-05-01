@@ -7,6 +7,7 @@ import '../theme/app_colors.dart';
 import '../theme/app_dimens.dart';
 import '../theme/app_text_styles.dart';
 import '../widgets/forest_background.dart';
+import '../widgets/lulu_mascot.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -246,36 +247,59 @@ class _BranchIllustration extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 140,
+      height: 190,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Branche
-          CustomPaint(
-            size: const Size(280, 60),
-            painter: _BranchPainter(),
-          ),
-          // Lanterne suspendue
+          // Halo de lumière sous la lanterne
           Positioned(
-            top: 20,
+            top: 60,
+            child: Container(
+              width: 110,
+              height: 110,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    AppColors.forestGold.withValues(alpha: 0.18),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ).animate(onPlay: (c) => c.repeat(reverse: true))
+             .scaleXY(begin: 0.85, end: 1.15, duration: 2000.ms,
+                 curve: Curves.easeInOut),
+          ),
+          // Branche
+          Positioned(
+            top: 0,
+            child: CustomPaint(
+              size: const Size(300, 70),
+              painter: _BranchPainter(),
+            ),
+          ),
+          // Fil + lanterne
+          Positioned(
+            top: 12,
             child: Column(
               children: [
                 Container(
-                  width: 2,
-                  height: 30,
-                  color: AppColors.forestBark.withValues(alpha: 0.8),
+                  width: 1.5,
+                  height: 36,
+                  color: AppColors.forestBark.withValues(alpha: 0.7),
                 ),
                 _Lantern(),
               ],
             ),
           ),
-          // Luciole qui peeks
+          // Lulu mascotte (flottante à droite)
           Positioned(
-            right: 60,
-            top: 10,
-            child: Text('🪲', style: const TextStyle(fontSize: 20))
+            right: 30,
+            top: 55,
+            child: LuluMascot(size: 36)
                 .animate(onPlay: (c) => c.repeat(reverse: true))
-                .moveY(begin: 0, end: -8, duration: 1500.ms, curve: Curves.easeInOut),
+                .moveY(begin: 0, end: -10, duration: 2200.ms,
+                    curve: Curves.easeInOut),
           ),
         ],
       ),
@@ -283,62 +307,193 @@ class _BranchIllustration extends StatelessWidget {
   }
 }
 
+// ── Lanterne dessinée ─────────────────────────────────────────────────────────
+
 class _Lantern extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 36,
-      height: 48,
-      decoration: BoxDecoration(
-        color: AppColors.forestGold,
-        borderRadius: BorderRadius.circular(8),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.forestGold.withValues(alpha: 0.7),
-            blurRadius: 20,
-            spreadRadius: 4,
-          ),
-        ],
-      ),
-      child: const Center(
-        child: Icon(Icons.local_fire_department,
-            color: AppColors.forestInk, size: 20),
-      ),
+    return SizedBox(
+      width: 56,
+      height: 92,
+      child: CustomPaint(painter: _LanternPainter()),
     ).animate(onPlay: (c) => c.repeat(reverse: true))
      .custom(
-       duration: 1400.ms,
-       builder: (ctx, v, child) => Opacity(opacity: 0.8 + v * 0.2, child: child),
+       duration: 1600.ms,
+       curve: Curves.easeInOut,
+       builder: (ctx, v, child) =>
+           Opacity(opacity: 0.82 + v * 0.18, child: child),
      );
   }
 }
 
+class _LanternPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size s) {
+    final cx = s.width / 2;
+    const topY = 10.0;
+    const botY = 72.0;
+    const midY = (topY + botY) / 2; // 41
+    const topHW = 14.0; // demi-largeur haut/bas
+    const midHW = 24.0; // demi-largeur ventre (barrel)
+
+    // ── Silhouette barrel ──────────────────────────────────────────
+    final body = Path()
+      ..moveTo(cx - topHW, topY)
+      ..lineTo(cx + topHW, topY)
+      ..cubicTo(cx + midHW, topY + (midY - topY) * 0.65,
+          cx + midHW, botY - (botY - midY) * 0.65, cx + topHW, botY)
+      ..lineTo(cx - topHW, botY)
+      ..cubicTo(cx - midHW, botY - (botY - midY) * 0.65,
+          cx - midHW, topY + (midY - topY) * 0.65, cx - topHW, topY)
+      ..close();
+
+    // ── 1. Remplissage : dégradé chaud gauche→centre→droite ────────
+    canvas.save();
+    canvas.clipPath(body);
+
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, s.width, s.height),
+      Paint()
+        ..shader = const LinearGradient(
+          colors: [
+            Color(0xFF7A4F20),
+            Color(0xFFE8B04A),
+            Color(0xFFF7E07A),
+            Color(0xFFE8B04A),
+            Color(0xFF7A4F20),
+          ],
+          stops: [0.0, 0.22, 0.5, 0.78, 1.0],
+        ).createShader(Rect.fromLTWH(0, 0, s.width, s.height)),
+    );
+
+    // Reflet interne (highlight en haut à gauche)
+    canvas.drawOval(
+      Rect.fromCenter(
+          center: Offset(cx - 5, midY - 8), width: 18, height: 26),
+      Paint()..color = Colors.white.withValues(alpha: 0.20),
+    );
+
+    // Nervures verticales (2 séparateurs = 3 panneaux)
+    final rib = Paint()
+      ..color = const Color(0xFF5A3A22).withValues(alpha: 0.45)
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(cx - 8, 0), Offset(cx - 8, s.height), rib);
+    canvas.drawLine(Offset(cx + 8, 0), Offset(cx + 8, s.height), rib);
+
+    canvas.restore();
+
+    // ── 2. Contour du corps ────────────────────────────────────────
+    canvas.drawPath(
+      body,
+      Paint()
+        ..color = const Color(0xFF4A2E10)
+        ..strokeWidth = 1.8
+        ..style = PaintingStyle.stroke,
+    );
+
+    // ── 3. Bandes métal haut & bas ─────────────────────────────────
+    final band = Paint()
+      ..color = const Color(0xFF4A2E10)
+      ..strokeWidth = 3.2
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(
+        Offset(cx - topHW + 1, topY), Offset(cx + topHW - 1, topY), band);
+    canvas.drawLine(
+        Offset(cx - topHW + 1, botY), Offset(cx + topHW - 1, botY), band);
+
+    // ── 4. Crochet haut ────────────────────────────────────────────
+    canvas.drawLine(
+      Offset(cx, topY),
+      Offset(cx, topY - 6),
+      Paint()
+        ..color = const Color(0xFF4A2E10)
+        ..strokeWidth = 2.0
+        ..strokeCap = StrokeCap.round,
+    );
+
+    // ── 5. Gland bas (tige + perle) ────────────────────────────────
+    canvas.drawLine(
+      Offset(cx, botY),
+      Offset(cx, botY + 8),
+      Paint()
+        ..color = const Color(0xFF4A2E10)
+        ..strokeWidth = 1.8
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawCircle(
+      Offset(cx, botY + 11),
+      3.5,
+      Paint()..color = AppColors.forestGold,
+    );
+  }
+
+  @override
+  bool shouldRepaint(_LanternPainter o) => false;
+}
+
+// ── Branche ───────────────────────────────────────────────────────────────────
+
 class _BranchPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = AppColors.forestBark.withValues(alpha: 0.85)
-      ..strokeWidth = 8
+    final barkPaint = Paint()
+      ..color = AppColors.forestBark.withValues(alpha: 0.88)
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
-    final path = Path()
-      ..moveTo(0, size.height * 0.6)
-      ..cubicTo(size.width * 0.2, size.height * 0.4,
-          size.width * 0.5, size.height * 0.3,
-          size.width, size.height * 0.5);
-    canvas.drawPath(path, paint);
+    // Branche principale (plus épaisse)
+    barkPaint.strokeWidth = 10;
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, size.height * 0.65)
+        ..cubicTo(size.width * 0.25, size.height * 0.35,
+            size.width * 0.5, size.height * 0.28,
+            size.width, size.height * 0.48),
+      barkPaint,
+    );
 
-    // Petites feuilles
-    final leafPaint = Paint()
-      ..color = AppColors.forestLeaf.withValues(alpha: 0.7)
-      ..style = PaintingStyle.fill;
-    for (final pos in [0.2, 0.5, 0.75]) {
-      canvas.drawCircle(
-        Offset(size.width * pos, size.height * 0.2),
-        6,
-        leafPaint,
-      );
+    // Ramification secondaire (à gauche)
+    barkPaint.strokeWidth = 5;
+    canvas.drawPath(
+      Path()
+        ..moveTo(size.width * 0.18, size.height * 0.50)
+        ..cubicTo(size.width * 0.10, size.height * 0.20,
+            size.width * 0.06, size.height * 0.05,
+            size.width * 0.10, 0),
+      barkPaint,
+    );
+
+    // Feuilles (formes ovales pointues)
+    final leafPaint = Paint()..style = PaintingStyle.fill;
+
+    void drawLeaf(Offset pos, double size2, double angle, Color color) {
+      canvas.save();
+      canvas.translate(pos.dx, pos.dy);
+      canvas.rotate(angle);
+      final leaf = Path()
+        ..moveTo(0, -size2)
+        ..cubicTo(size2 * 0.55, -size2 * 0.4, size2 * 0.55, size2 * 0.4, 0, size2)
+        ..cubicTo(-size2 * 0.55, size2 * 0.4, -size2 * 0.55, -size2 * 0.4, 0, -size2)
+        ..close();
+      leafPaint.color = color;
+      canvas.drawPath(leaf, leafPaint);
+      canvas.restore();
     }
+
+    final leafColor = AppColors.forestLeaf.withValues(alpha: 0.75);
+    final leafDark  = AppColors.moss.withValues(alpha: 0.65);
+
+    drawLeaf(Offset(size.width * 0.12, size.height * 0.12), 9,  0.4,  leafColor);
+    drawLeaf(Offset(size.width * 0.08, size.height * 0.05), 7,  -0.5, leafDark);
+    drawLeaf(Offset(size.width * 0.22, size.height * 0.22), 8,  1.1,  leafColor);
+    drawLeaf(Offset(size.width * 0.42, size.height * 0.15), 10, 0.2,  leafColor);
+    drawLeaf(Offset(size.width * 0.48, size.height * 0.08), 7,  -0.6, leafDark);
+    drawLeaf(Offset(size.width * 0.68, size.height * 0.18), 9,  0.7,  leafColor);
+    drawLeaf(Offset(size.width * 0.75, size.height * 0.10), 6,  -0.3, leafDark);
+    drawLeaf(Offset(size.width * 0.88, size.height * 0.22), 8,  1.2,  leafColor);
   }
 
   @override

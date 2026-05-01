@@ -3,12 +3,17 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'app_settings_service.dart';
 
 class GeminiTtsService {
   final String apiKey;
 
   static const String _voice = 'Aoede';
   static const Duration _timeout = Duration(seconds: 90);
+
+  // Gain PCM appliqué à la source pour éviter la saturation Gemini TTS.
+  // Gemini génère souvent à pleine échelle ; 0.60 ≈ -4.4 dB de headroom.
+  static const double _sourceGain = 0.60;
 
   GeminiTtsService(this.apiKey);
 
@@ -17,6 +22,11 @@ class GeminiTtsService {
       'https://generativelanguage.googleapis.com/v1beta/models/'
       'gemini-3.1-flash-tts-preview:generateContent?key=$apiKey',
     );
+
+    // Mappe le speechRate flutter_tts (0.2–0.9, défaut 0.45)
+    // vers l'échelle Gemini TTS (0.25–4.0, défaut 1.0).
+    final speakingRate =
+        (appSettings.speechRate / 0.45).clamp(0.5, 2.5);
 
     final body = jsonEncode({
       'contents': [
@@ -30,6 +40,7 @@ class GeminiTtsService {
           'voiceConfig': {
             'prebuiltVoiceConfig': {'voiceName': _voice},
           },
+          'speakingRate': speakingRate,
         },
       },
     });
@@ -99,10 +110,11 @@ class GeminiTtsService {
     final rateMatch = RegExp(r'rate=(\d+)').firstMatch(mimeType);
     final originalRate = int.parse(rateMatch?.group(1) ?? '24000');
 
-    // Downsample 24kHz → 16kHz : -50% de taille, qualité largement suffisante
-    final pcmFinal = originalRate == 24000
+    // Downsample 24kHz → 16kHz puis normalisation du gain source
+    final pcmDownsampled = originalRate == 24000
         ? _downsample24to16kHz(pcmBytes)
         : pcmBytes;
+    final pcmFinal = _applyGain(pcmDownsampled, _sourceGain);
     const targetRate = 16000;
 
     debugPrint(
@@ -122,6 +134,20 @@ class GeminiTtsService {
       }
     } catch (_) {}
     return 25; // délai par défaut si non parseable
+  }
+
+  /// Réduit le gain des samples PCM 16-bit signé pour éviter la saturation.
+  Uint8List _applyGain(Uint8List pcm, double gain) {
+    final result = Uint8List(pcm.length);
+    final src = ByteData.sublistView(pcm);
+    final dst = ByteData.sublistView(result);
+    for (int i = 0; i + 1 < pcm.length; i += 2) {
+      final sample = (src.getInt16(i, Endian.little) * gain)
+          .round()
+          .clamp(-32768, 32767);
+      dst.setInt16(i, sample, Endian.little);
+    }
+    return result;
   }
 
   /// Downsample PCM 16-bit mono de 24kHz à 16kHz (ratio 2/3).
