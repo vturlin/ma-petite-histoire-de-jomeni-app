@@ -75,7 +75,7 @@ class GeminiService {
         '- Univers / thème : $theme\n'
         '- Type d\'histoire : $typeLabel\n'
         '- Consignes de style pour ce type : $typeHint\n'
-        '- Objet magique : $magicObject\n\n'
+        '- Objet magique : $magicObject — cet objet doit être au cœur de l\'histoire et de l\'intrigue : c\'est lui qui déclenche l\'aventure, permet de surmonter l\'obstacle principal ou révèle son pouvoir au moment décisif\n\n'
         'L\'histoire doit durer 3-5 minutes à lire à voix haute (400-600 mots). '
         'Termine sur un message positif ou une leçon douce. '
         'Rappel : soigne la ponctuation car le texte sera lu par un robot TTS.';
