@@ -118,40 +118,71 @@ class _StoryScreenState extends State<StoryScreen> {
       final service = GeminiService(widget.apiKey);
       _promptUsed = service.buildPrompt(widget.config!);
 
-      String story;
-      if (appSettings.betaMode) {
-        // 🧪 Mode bêta : Gemini Live API (WebSocket)
-        final liveService = GeminiLiveService(widget.apiKey);
-        final buffer = StringBuffer();
-        await for (final chunk in liveService.generateStoryStream(_promptUsed)) {
-          buffer.write(chunk);
-        }
-        story = buffer.toString();
-      } else if (kIsWeb) {
-        story = await service.generateStory(widget.config!);
-      } else {
-        final buffer = StringBuffer();
-        await for (final chunk in service.generateStoryStream(widget.config!)) {
-          buffer.write(chunk);
-        }
-        story = buffer.toString();
+      // Web : pas de streaming natif → typewriter classique
+      if (kIsWeb && !appSettings.betaMode) {
+        final story = await service.generateStory(widget.config!);
+        _fullStory = story;
+        _chunks = _splitIntoChunks(_fullStory);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('last_story', _fullStory);
+        setState(() => _isLoading = false);
+        _startTypewriter();
+        _preGenerateFirstChunk();
+        return;
       }
 
-      _fullStory = story;
+      // Streaming : texte affiché en temps réel dès les premiers tokens
+      final Stream<String> textStream = appSettings.betaMode
+          ? GeminiLiveService(widget.apiKey).generateStoryStream(_promptUsed)
+          : service.generateStoryStream(widget.config!);
+
+      final buffer = StringBuffer();
+      var lastUpdate = DateTime.now();
+      setState(() { _isLoading = false; _isTyping = true; });
+
+      await for (final piece in textStream) {
+        buffer.write(piece);
+        // Mise à jour UI batchée (~10 fps) pour ne pas saturer le renderer
+        final now = DateTime.now();
+        if (now.difference(lastUpdate).inMilliseconds > 100) {
+          if (mounted) setState(() => _displayedStory = buffer.toString());
+          lastUpdate = now;
+        }
+      }
+
+      _fullStory = buffer.toString();
       _chunks = _splitIntoChunks(_fullStory);
 
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('last_story', _fullStory);
       await prefs.setString('last_prompt', _promptUsed);
 
-      setState(() => _isLoading = false);
-      _startTypewriter();
+      if (mounted) setState(() { _displayedStory = _fullStory; _isTyping = false; });
+
+      // Pré-génère le 1er chunk audio en arrière-plan pendant que l'enfant lit
+      _preGenerateFirstChunk();
+
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _error =
-            'Impossible de créer l\'histoire.\n\nVérifie ta connexion et réessaie.\n\n($e)';
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isTyping = false;
+          _error =
+              'Impossible de créer l\'histoire.\n\nVérifie ta connexion et réessaie.\n\n($e)';
+        });
+      }
+    }
+  }
+
+  /// Pré-génère le premier chunk audio en arrière-plan (silencieux si échec).
+  /// Quand l'enfant appuie sur Play, l'audio du début est déjà prêt.
+  Future<void> _preGenerateFirstChunk() async {
+    if (!_useGeminiAudio || _chunks.isEmpty || _audioCache.containsKey(0)) return;
+    try {
+      final audio = await GeminiTtsService(widget.apiKey).generateAudio(_chunks[0]);
+      if (mounted) setState(() => _audioCache[0] = audio);
+    } catch (_) {
+      // Silencieux — sera généré à la demande dans _playChunk
     }
   }
 
