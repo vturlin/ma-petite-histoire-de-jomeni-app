@@ -40,7 +40,13 @@ class _ProfilesScreenState extends State<ProfilesScreen> {
 
   void _selectProfile(UserProfile profile) {
     userProfileService.currentProfile = profile;
-    context.go('/');
+    // Si on vient de l'accueil (push), on pop pour déclencher le setState home.
+    // Sinon (démarrage initial), on navigue vers l'accueil.
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/');
+    }
   }
 
   @override
