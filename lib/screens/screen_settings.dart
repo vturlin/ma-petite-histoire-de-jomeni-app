@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import '../models/story_config.dart';
+import '../models/user_profile.dart';
 import '../services/app_settings_service.dart';
 import '../services/voice_guide_service.dart';
 import '../theme/app_colors.dart';
@@ -252,6 +255,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ],
                       ),
                     ),
+                    if (appSettings.betaMode) ...[
+                      const SizedBox(height: AppSpacing.s12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            // Config minimal pour tester directement
+                            final config = StoryConfig(
+                              storyTitle: 'Test bêta',
+                              themeLabel: 'Forêt enchantée',
+                              themeEmoji: '🌲',
+                              heroName: 'Léo',
+                              characterType: CharacterType.hero,
+                              magicObject: '🪄 Baguette',
+                              childGender: ProfileGender.boy,
+                            );
+                            context.push('/generating', extra: config);
+                          },
+                          icon: const Icon(Icons.science_outlined),
+                          label: const Text('Tester la génération →'),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
