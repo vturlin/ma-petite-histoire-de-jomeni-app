@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'app_settings_service.dart';
 
 class GeminiTtsService {
   final String apiKey;
@@ -23,11 +22,6 @@ class GeminiTtsService {
       'gemini-3.1-flash-tts-preview:generateContent?key=$apiKey',
     );
 
-    // Mappe le speechRate flutter_tts (0.2–0.9, défaut 0.45)
-    // vers l'échelle Gemini TTS (0.25–4.0, défaut 1.0).
-    final speakingRate =
-        (appSettings.speechRate / 0.45).clamp(0.5, 2.5);
-
     final body = jsonEncode({
       'contents': [
         {
@@ -40,7 +34,6 @@ class GeminiTtsService {
           'voiceConfig': {
             'prebuiltVoiceConfig': {'voiceName': _voice},
           },
-          'speakingRate': speakingRate,
         },
       },
     });
