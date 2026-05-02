@@ -42,6 +42,9 @@ class _CharacterScreenState extends State<CharacterScreen> {
         if (_selected == CharacterType.hero) {
           context.push('/hero-name', extra: widget.config);
         } else {
+          // Pour "moi-même", on utilise le prénom du profil comme nom du héros
+          widget.config.heroName =
+              userProfileService.currentProfile?.name ?? '';
           context.push('/theme', extra: widget.config);
         }
       },

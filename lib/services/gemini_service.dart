@@ -43,8 +43,15 @@ class GeminiService {
     final age = config.ageCategory?.label ?? '4-6 ans';
     final heroName = config.heroName.isEmpty ? 'le héros' : config.heroName;
     final character = config.characterType == CharacterType.myself
-        ? "l'enfant lui-même"
+        ? heroName.isNotEmpty
+            ? "l'enfant lui-même, prénommé(e) $heroName"
+            : "l'enfant lui-même"
         : 'un héros nommé $heroName';
+
+    final titleLine = config.storyTitle.trim().isNotEmpty
+        ? '- Titre choisi par l\'enfant : "${config.storyTitle.trim()}" — '
+          'inspire-toi de ce titre pour le ton, l\'atmosphère et les attentes de l\'histoire\n'
+        : '';
     final theme = config.themeLabel.isNotEmpty ? config.themeLabel : 'aventure';
     final typeLabel = config.storyType?.label ?? 'Aventure';
     final typeHint  = config.storyType?.promptHint ?? '';
@@ -70,6 +77,7 @@ class GeminiService {
     }
 
     return 'Écris une histoire pour enfants de $age ans avec :\n'
+        '$titleLine'
         '- Personnage principal : $character\n'
         '$genderLine'
         '- Univers / thème : $theme\n'
