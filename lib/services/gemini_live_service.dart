@@ -24,8 +24,7 @@ class GeminiLiveService {
 
   GeminiLiveService(this.apiKey);
 
-  /// Génère l'histoire en streaming via WebSocket.
-  /// Prend le prompt déjà construit (réutilise GeminiService.buildPrompt).
+  /// Génère l'histoire en streaming via une seule boucle WebSocket.
   Stream<String> generateStoryStream(String prompt) async* {
     final uri = Uri.parse(
       'wss://generativelanguage.googleapis.com/ws/'
@@ -38,10 +37,10 @@ class GeminiLiveService {
       channel = WebSocketChannel.connect(uri);
       await channel.ready;
     } catch (e) {
-      throw Exception('Live API : connexion impossible — $e');
+      throw Exception('Live API : connexion WebSocket impossible — $e');
     }
 
-    // ── 1. Setup ────────────────────────────────────────────────────────────
+    // Envoyer le setup
     channel.sink.add(jsonEncode({
       'setup': {
         'model': _model,
@@ -58,61 +57,76 @@ class GeminiLiveService {
       },
     }));
 
-    // ── 2. Attendre setupComplete ────────────────────────────────────────────
     bool setupDone = false;
+    String? serverError;
+
+    // Une seule boucle pour setup + contenu
     await for (final raw in channel.stream) {
-      debugPrint('Live API setup: $raw');
+      Map<String, dynamic> data;
       try {
-        final msg = jsonDecode(raw as String) as Map<String, dynamic>;
-        if (msg.containsKey('setupComplete')) {
-          setupDone = true;
-          break;
-        }
-      } catch (_) {}
-    }
-
-    if (!setupDone) {
-      await channel.sink.close();
-      throw Exception('Live API : setupComplete non reçu.');
-    }
-
-    // ── 3. Envoyer le prompt ─────────────────────────────────────────────────
-    channel.sink.add(jsonEncode({
-      'clientContent': {
-        'turns': [
-          {
-            'role': 'user',
-            'parts': [
-              {'text': prompt}
-            ],
-          }
-        ],
-        'turnComplete': true,
-      },
-    }));
-
-    // ── 4. Streamer les chunks de texte ──────────────────────────────────────
-    await for (final raw in channel.stream) {
-      try {
-        final data = jsonDecode(raw as String) as Map<String, dynamic>;
-        final sc = data['serverContent'] as Map<String, dynamic>?;
-        if (sc == null) continue;
-
-        final modelTurn = sc['modelTurn'] as Map<String, dynamic>?;
-        if (modelTurn != null) {
-          final parts = modelTurn['parts'] as List? ?? [];
-          for (final part in parts) {
-            final text = (part as Map<String, dynamic>)['text'] as String?;
-            if (text != null && text.isNotEmpty) yield text;
-          }
-        }
-
-        if (sc['turnComplete'] == true) break;
+        data = jsonDecode(raw as String) as Map<String, dynamic>;
       } catch (e) {
-        debugPrint('Live API parse error: $e');
+        debugPrint('Live API JSON invalide: $raw');
+        continue;
       }
+
+      debugPrint('Live API ← ${raw.toString().substring(0, raw.toString().length.clamp(0, 200))}');
+
+      // Erreur serveur
+      if (data.containsKey('error')) {
+        serverError = data['error'].toString();
+        break;
+      }
+
+      // Phase setup
+      if (!setupDone) {
+        if (data.containsKey('setupComplete')) {
+          setupDone = true;
+          // Envoyer le prompt maintenant que le setup est confirmé
+          channel.sink.add(jsonEncode({
+            'clientContent': {
+              'turns': [
+                {
+                  'role': 'user',
+                  'parts': [
+                    {'text': prompt}
+                  ],
+                }
+              ],
+              'turnComplete': true,
+            },
+          }));
+        }
+        // Ignorer les autres messages avant setupComplete
+        continue;
+      }
+
+      // Phase contenu — extraire les chunks de texte
+      final sc = data['serverContent'] as Map<String, dynamic>?;
+      if (sc == null) continue;
+
+      final modelTurn = sc['modelTurn'] as Map<String, dynamic>?;
+      if (modelTurn != null) {
+        final parts = modelTurn['parts'] as List? ?? [];
+        for (final part in parts) {
+          final text = (part as Map<String, dynamic>)['text'] as String?;
+          if (text != null && text.isNotEmpty) yield text;
+        }
+      }
+
+      if (sc['turnComplete'] == true) break;
     }
 
     await channel.sink.close();
+
+    if (serverError != null) {
+      throw Exception('Live API erreur serveur : $serverError');
+    }
+    if (!setupDone) {
+      throw Exception(
+        'Live API : setupComplete non reçu. '
+        'Vérifie que ton API key a accès au modèle $_model.',
+      );
+    }
   }
 }
