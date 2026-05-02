@@ -231,12 +231,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Gemini Live API',
+                                Text('gemini-3-flash-preview',
                                     style: AppText.titleMedium),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Génération via WebSocket (gemini-2.0-flash-live-001). '
-                                  'Expérimental — peut être instable.',
+                                  'Génération de texte avec le modèle Gemini 3. '
+                                  'Même audio TTS qu\'en mode normal.',
                                   style: AppText.bodySmall,
                                 ),
                               ],
