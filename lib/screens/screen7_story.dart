@@ -204,7 +204,8 @@ class _StoryScreenState extends State<StoryScreen> {
     });
   }
 
-  bool get _useGeminiAudio => widget.isLibraryMode;
+  // Bêta : Gemini TTS pour la lecture live aussi (pas seulement la bibliothèque)
+  bool get _useGeminiAudio => widget.isLibraryMode || appSettings.betaMode;
 
   Future<void> _handlePlayButton() async {
     if (_useGeminiAudio) {
@@ -285,6 +286,16 @@ class _StoryScreenState extends State<StoryScreen> {
     });
 
     try {
+      // Génère le chunk audio à la demande si pas encore en cache
+      // (mode bêta lecture live, ou bibliothèque avec chunk manquant)
+      if (!_audioCache.containsKey(index)) {
+        setState(() => _audioStatus =
+            'Génération audio ${index + 1}/${_chunks.length}...');
+        final tts = GeminiTtsService(widget.apiKey);
+        final generated = await tts.generateAudio(_chunks[index]);
+        _audioCache[index] = generated;
+      }
+
       final audio = _audioCache[index];
       if (audio == null) throw Exception('Audio introuvable pour ce chunk.');
 
