@@ -204,6 +204,54 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             style: AppText.bodySmall),
                       ),
                     ),
+                    const SizedBox(height: AppSpacing.s32),
+
+                    // ── Mode bêta ──────────────────────────────────────────
+                    _SectionHeader(
+                      icon: Icons.science_outlined,
+                      label: 'Mode Bêta',
+                    ),
+                    const SizedBox(height: AppSpacing.s12),
+                    Container(
+                      padding: const EdgeInsets.all(AppSpacing.s16),
+                      decoration: BoxDecoration(
+                        color: AppColors.forestBg2,
+                        borderRadius: AppRadius.all(AppRadius.xl),
+                        border: Border.all(
+                          color: AppColors.forestGold.withValues(alpha: 0.35),
+                          width: 1.5,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Gemini Live API',
+                                    style: AppText.titleMedium),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Génération via WebSocket (gemini-2.0-flash-live-001). '
+                                  'Expérimental — peut être instable.',
+                                  style: AppText.bodySmall,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: AppSpacing.s12),
+                          Switch(
+                            value: appSettings.betaMode,
+                            activeThumbColor: AppColors.forestGold,
+                            activeTrackColor: AppColors.forestGold.withValues(alpha: 0.5),
+                            onChanged: (v) async {
+                              await appSettings.setBetaMode(v);
+                              setState(() {});
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),

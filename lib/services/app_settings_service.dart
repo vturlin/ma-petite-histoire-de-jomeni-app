@@ -6,8 +6,9 @@ class AppSettingsService extends ChangeNotifier {
   static const _keyVolume      = 'voice_volume';
   static const _keyPitch       = 'voice_pitch';
   static const _keyAudioVolume = 'audio_volume';
-  static const _keyVoiceName    = 'voice_name';
-  static const _keyVoiceLocale  = 'voice_locale';
+  static const _keyVoiceName   = 'voice_name';
+  static const _keyVoiceLocale = 'voice_locale';
+  static const _keyBetaMode   = 'beta_mode';
 
   double _speechRate   = kIsWeb ? 0.75 : 0.45;
   double _speechVolume = 1.0;
@@ -17,12 +18,15 @@ class AppSettingsService extends ChangeNotifier {
   // null = laisser l'OS choisir la voix par défaut
   String? _voiceName;
   String? _voiceLocale;
+  bool    _betaMode = false;
+
   double  get speechRate    => _speechRate;
   double  get speechVolume  => _speechVolume;
   double  get speechPitch   => _speechPitch;
   double  get audioVolume   => _audioVolume;
   String? get voiceName     => _voiceName;
   String? get voiceLocale   => _voiceLocale;
+  bool    get betaMode      => _betaMode;
 
   static Future<AppSettingsService> load() async {
     final svc = AppSettingsService();
@@ -33,6 +37,7 @@ class AppSettingsService extends ChangeNotifier {
     svc._audioVolume  = prefs.getDouble(_keyAudioVolume) ?? svc._audioVolume;
     svc._voiceName    = prefs.getString(_keyVoiceName);
     svc._voiceLocale  = prefs.getString(_keyVoiceLocale);
+    svc._betaMode     = prefs.getBool(_keyBetaMode) ?? false;
     return svc;
   }
 
@@ -76,6 +81,13 @@ class AppSettingsService extends ChangeNotifier {
       await prefs.setString(_keyVoiceName, name);
       if (locale != null) await prefs.setString(_keyVoiceLocale, locale);
     }
+  }
+
+  Future<void> setBetaMode(bool v) async {
+    _betaMode = v;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyBetaMode, v);
   }
 }
 

@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/saved_story.dart';
 import '../models/story_config.dart';
 import '../services/gemini_service.dart';
+import '../services/gemini_live_service.dart';
 import '../services/gemini_tts_service.dart';
 import '../services/story_library_service.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -118,7 +119,15 @@ class _StoryScreenState extends State<StoryScreen> {
       _promptUsed = service.buildPrompt(widget.config!);
 
       String story;
-      if (kIsWeb) {
+      if (appSettings.betaMode) {
+        // 🧪 Mode bêta : Gemini Live API (WebSocket)
+        final liveService = GeminiLiveService(widget.apiKey);
+        final buffer = StringBuffer();
+        await for (final chunk in liveService.generateStoryStream(_promptUsed)) {
+          buffer.write(chunk);
+        }
+        story = buffer.toString();
+      } else if (kIsWeb) {
         story = await service.generateStory(widget.config!);
       } else {
         final buffer = StringBuffer();

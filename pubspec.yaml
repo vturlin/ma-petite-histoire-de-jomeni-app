@@ -43,6 +43,7 @@ dependencies:
   flutter_animate: ^4.5.0
   shared_preferences: ^2.5.3
   flutter_dotenv: ^5.2.1
+  web_socket_channel: ^3.0.0
   flutter_markdown: ^0.7.6
   google_fonts: ^6.2.1
   permission_handler: ^11.3.1
